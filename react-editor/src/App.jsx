@@ -315,9 +315,9 @@ export default function App() {
     <div className="app" ref={dropRef}>
       <header className="topbar">
         <div className="brand">
-          <div className="logo" aria-hidden="true">R</div>
+          <div className="logo" aria-hidden="true">T</div>
           <div className="brandText">
-            <div className="title">React Text Editor</div>
+            <div className="title">Textory</div>
             <div className="subtitle">
               {activeDoc ? `${activeDoc.name}${activeDirty ? ' • unsaved' : ''}` : 'No document'}
             </div>
@@ -483,6 +483,14 @@ export default function App() {
           <span className="pill">Last edit: {activeDoc?.updatedAt ? formatTimestamp(activeDoc.updatedAt) : '--:--'}</span>
           <span className="pill">Find/Replace: Ctrl+F / Ctrl+H</span>
         </div>
+      </footer>
+
+      <footer className="credits" aria-label="Developer credits">
+        <span>© 2026 Textory · Built by Ritik Kumar</span>
+        <span className="creditsSep">·</span>
+        <a className="creditsLink" href="https://github.com/KumarRitik5" target="_blank" rel="noreferrer">GitHub</a>
+        <span className="creditsSep">·</span>
+        <a className="creditsLink" href="mailto:ritikkumar12bicbly@gmail.com">Email</a>
       </footer>
 
       {toastMsg ? <div className="toast" role="status" aria-live="polite">{toastMsg}</div> : null}

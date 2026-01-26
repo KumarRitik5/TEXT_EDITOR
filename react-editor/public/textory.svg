@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5b8cff" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#ff5b6a" stop-opacity="0.90"/>
+    </linearGradient>
+    <linearGradient id="s" x1="20" y1="18" x2="44" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.92)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0.78)"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="8" width="44" height="48" rx="12" fill="url(#g)"/>
+  <!-- Stylized T -->
+  <path d="M20 22h24v6H35v20h-6V28H20z" fill="url(#s)"/>
+</svg>

@@ -1,4 +1,4 @@
-# Text Editor
+# Textory
 
 The main app is now React-based and lives in [react-editor/](react-editor/).
 

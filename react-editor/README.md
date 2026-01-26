@@ -1,5 +1,5 @@
 
-# React Text Editor
+# Textory
 
 A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 

@@ -207,6 +207,33 @@ body{
   background: rgba(255,255,255,0.03);
 }
 
+.credits{
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  border-top: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  flex-wrap: wrap;
+}
+
+.creditsSep{ color: var(--muted); }
+
+.creditsLink{
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.creditsLink:hover{ background: var(--panel2); }
+
 .statusLeft, .statusRight{
   display: flex;
   gap: 14px;
