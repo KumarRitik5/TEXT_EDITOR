@@ -410,6 +410,9 @@ body{
   color: var(--muted);
 }
 
+/* monaco-vim status text lives inside this pill */
+.pill:empty{ display: none; }
+
 /* Subtle, consistent scrollbars (best-effort across browsers) */
 *{
   scrollbar-width: thin;

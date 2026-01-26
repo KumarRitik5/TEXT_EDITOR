@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
+import { initVimMode } from 'monaco-vim'
 import './monacoSetup'
 import './App.css'
 import LanguagePicker from './components/LanguagePicker'
@@ -11,6 +12,69 @@ const DEFAULT_SETTINGS = {
   fontSize: 16,
   wordWrap: 'on', // 'on' | 'off'
   minimap: true,
+  formatOnSave: true,
+  vimMode: false,
+}
+
+function getExt(name) {
+  const lower = String(name || '').toLowerCase()
+  const idx = lower.lastIndexOf('.')
+  if (idx <= -1) return ''
+  return lower.slice(idx + 1)
+}
+
+function getPrettierParser({ name, language }) {
+  const ext = getExt(name)
+
+  // Prefer extension-based decisions for correctness (jsx/tsx).
+  if (ext === 'jsx') return 'babel'
+  if (ext === 'js') return 'babel'
+  if (ext === 'tsx') return 'typescript'
+  if (ext === 'ts') return 'typescript'
+  if (ext === 'json') return 'json'
+  if (ext === 'html') return 'html'
+  if (ext === 'css') return 'css'
+  if (ext === 'md') return 'markdown'
+
+  // Fallback to language id if extension isn't helpful.
+  if (language === 'javascript') return 'babel'
+  if (language === 'typescript') return 'typescript'
+  if (language === 'json') return 'json'
+  if (language === 'html') return 'html'
+  if (language === 'css') return 'css'
+  if (language === 'markdown') return 'markdown'
+
+  return null
+}
+
+let prettierLoaderPromise = null
+async function loadPrettier() {
+  if (prettierLoaderPromise) return prettierLoaderPromise
+
+  prettierLoaderPromise = (async () => {
+    const prettier = (await import('prettier/standalone')).default
+    const [babel, estree, typescript, html, postcss, markdown] = await Promise.all([
+      import('prettier/plugins/babel'),
+      import('prettier/plugins/estree'),
+      import('prettier/plugins/typescript'),
+      import('prettier/plugins/html'),
+      import('prettier/plugins/postcss'),
+      import('prettier/plugins/markdown'),
+    ])
+
+    const plugins = [
+      babel.default ?? babel,
+      estree.default ?? estree,
+      typescript.default ?? typescript,
+      html.default ?? html,
+      postcss.default ?? postcss,
+      markdown.default ?? markdown,
+    ]
+
+    return { prettier, plugins }
+  })()
+
+  return prettierLoaderPromise
 }
 
 function makeId() {
@@ -49,6 +113,8 @@ export default function App() {
 
   const monacoRef = useRef(null)
   const editorRef = useRef(null)
+  const vimModeRef = useRef(null)
+  const vimStatusRef = useRef(null)
 
   const [helpOpen, setHelpOpen] = useState(false)
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
@@ -77,6 +143,44 @@ export default function App() {
     editorRef.current = editor
     monacoRef.current = monaco
 
+    // Register a Prettier-based formatter for common web languages.
+    // This makes Monaco's built-in "Format Document" action work consistently.
+    const register = (languageId) => {
+      monaco.languages.registerDocumentFormattingEditProvider(languageId, {
+        provideDocumentFormattingEdits: async (model) => {
+          const inferredName = model?.uri?.path ? model.uri.path.split('/').pop() : ''
+          const parser = getPrettierParser({ name: inferredName, language: model.getLanguageId() })
+          if (!parser) return []
+
+          try {
+            const { prettier, plugins } = await loadPrettier()
+            const formatted = await prettier.format(model.getValue(), {
+              parser,
+              plugins,
+              tabWidth: 2,
+              useTabs: false,
+              semi: true,
+              singleQuote: true,
+              trailingComma: 'es5',
+              bracketSpacing: true,
+              printWidth: 100,
+              endOfLine: 'auto',
+            })
+            return [{ range: model.getFullModelRange(), text: formatted }]
+          } catch {
+            return []
+          }
+        },
+      })
+    }
+
+    register('javascript')
+    register('typescript')
+    register('json')
+    register('html')
+    register('css')
+    register('markdown')
+
     // Keep cursor position updated for status bar.
     setCursorPos({
       line: editor.getPosition()?.lineNumber ?? 1,
@@ -90,6 +194,40 @@ export default function App() {
       })
     })
   }
+
+  // Vim mode (monaco-vim)
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    // Dispose any previous instance before (re)initializing.
+    if (vimModeRef.current) {
+      try { vimModeRef.current.dispose() } catch { /* ignore */ }
+      vimModeRef.current = null
+    }
+
+    if (!settings.vimMode) {
+      if (vimStatusRef.current) vimStatusRef.current.textContent = ''
+      return
+    }
+
+    // Status node is optional but makes Vim feel much more usable.
+    const statusNode = vimStatusRef.current || undefined
+    try {
+      vimModeRef.current = initVimMode(editor, statusNode)
+    } catch {
+      toast('Vim mode not available')
+      setSettings({ vimMode: false })
+    }
+
+    return () => {
+      if (vimModeRef.current) {
+        try { vimModeRef.current.dispose() } catch { /* ignore */ }
+        vimModeRef.current = null
+      }
+      if (vimStatusRef.current) vimStatusRef.current.textContent = ''
+    }
+  }, [settings.vimMode])
 
   // Monaco doesn't always update an existing model's language just because the `language` prop changes.
   // Force it whenever the active tab or language changes.
@@ -180,6 +318,17 @@ export default function App() {
   async function saveDoc({ saveAs = false } = {}) {
     if (!activeDoc) return
     try {
+      if (settings.formatOnSave) {
+        const editor = editorRef.current
+        if (editor) {
+          try {
+            await editor.getAction('editor.action.formatDocument')?.run()
+          } catch {
+            // ignore
+          }
+        }
+      }
+
       const existingHandle = saveAs ? null : (fileHandlesRef.current.get(activeDoc.id) || null)
       const { handle } = await saveTextFile({
         suggestedName: activeDoc.name,
@@ -211,7 +360,7 @@ export default function App() {
   function formatDoc() {
     const editor = editorRef.current
     if (!editor) return
-    // Monaco built-in formatting (e.g. JSON) if available.
+    // Monaco formatting (backed by Prettier for common languages via providers above).
     editor.getAction('editor.action.formatDocument')?.run()
       .then(() => toast('Formatted'))
       .catch(() => toast('Format not available'))
@@ -377,6 +526,24 @@ export default function App() {
           <button className="btn btnPrimary" type="button" onClick={() => saveDoc({ saveAs: false })} title="Save (Ctrl+S)">Save</button>
           <button className="btn" type="button" onClick={() => saveDoc({ saveAs: true })} title="Save As (Ctrl+Shift+S)">Save As</button>
 
+          <button
+            className="btn"
+            type="button"
+            onClick={() => setSettings({ formatOnSave: !settings.formatOnSave })}
+            title="Automatically formats supported files on Save"
+          >
+            Format on Save: {settings.formatOnSave ? 'on' : 'off'}
+          </button>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={() => setSettings({ vimMode: !settings.vimMode })}
+            title="Toggle Vim motions (Esc to Normal mode)"
+          >
+            Vim: {settings.vimMode ? 'on' : 'off'}
+          </button>
+
           <div className="divider" aria-hidden="true" />
 
           <LanguagePicker
@@ -508,7 +675,7 @@ export default function App() {
             <Editor
               height="100%"
               defaultLanguage="plaintext"
-              path={activeDoc.id}
+              path={`${activeDoc.id}/${activeDoc.name || 'document.txt'}`}
               language={activeDoc.language}
               value={activeDoc.value}
               theme={settings.theme === 'dark' ? 'vs-dark' : 'vs'}
@@ -520,6 +687,11 @@ export default function App() {
                 fontSize: settings.fontSize,
                 wordWrap: settings.wordWrap,
                 minimap: { enabled: settings.minimap },
+                formatOnPaste: true,
+                formatOnType: true,
+                autoClosingBrackets: 'always',
+                autoClosingQuotes: 'always',
+                autoIndent: 'full',
                 smoothScrolling: true,
                 cursorSmoothCaretAnimation: 'on',
                 scrollBeyondLastLine: false,
@@ -539,6 +711,12 @@ export default function App() {
           <span className="pill">Ln {cursorPos.line}, Col {cursorPos.col}</span>
         </div>
         <div className="statusRight">
+          <span
+            className="pill"
+            ref={vimStatusRef}
+            title="Vim status"
+            aria-label="Vim status"
+          />
           <span className="pill">{activeDirty ? 'Unsaved' : 'Saved'}</span>
           <span className="pill">Last edit: {activeDoc?.updatedAt ? formatTimestamp(activeDoc.updatedAt) : '--:--'}</span>
           <span className="pill">Find/Replace: Ctrl+F / Ctrl+H</span>
