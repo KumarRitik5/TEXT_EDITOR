@@ -16,6 +16,7 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Help dialog (explains Wrap/Minimap + shortcuts)
 - Save As + Format button
 - Drag & drop a file onto the editor to open it
+- Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
 
 ## Run

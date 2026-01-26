@@ -12,7 +12,7 @@ export async function openTextFile() {
         {
           description: 'Text files',
           accept: {
-            'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py'],
+            'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py', '.java'],
           },
         },
       ],
@@ -30,7 +30,7 @@ export async function openTextFile() {
   // Fallback: hidden input element
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.txt,.md,.json,.js,.ts,.jsx,.tsx,.html,.css,.py,text/plain';
+  input.accept = '.txt,.md,.json,.js,.ts,.jsx,.tsx,.html,.css,.py,.java,text/plain';
 
   const file = await new Promise((resolve, reject) => {
     input.addEventListener('change', () => resolve(input.files?.[0] ?? null), { once: true });
@@ -50,7 +50,7 @@ export async function saveTextFile({ suggestedName, text, existingHandle }) {
       types: [
         {
           description: 'Text files',
-          accept: { 'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py'] },
+          accept: { 'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py', '.java'] },
         },
       ],
     });
@@ -87,5 +87,6 @@ export function guessLanguageFromFilename(name) {
   if (lower.endsWith('.html')) return 'html';
   if (lower.endsWith('.css')) return 'css';
   if (lower.endsWith('.py')) return 'python';
+  if (lower.endsWith('.java')) return 'java';
   return 'plaintext';
 }

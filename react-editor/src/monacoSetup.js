@@ -10,3 +10,4 @@ import 'monaco-editor/esm/vs/language/html/monaco.contribution'
 // Extra tokenizers for the language picker
 import 'monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution'
 import 'monaco-editor/esm/vs/basic-languages/python/python.contribution'
+import 'monaco-editor/esm/vs/basic-languages/java/java.contribution'

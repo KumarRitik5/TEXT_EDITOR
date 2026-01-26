@@ -500,6 +500,7 @@ export default function App() {
     { label: 'Plain text', value: 'plaintext' },
     { label: 'JavaScript', value: 'javascript' },
     { label: 'TypeScript', value: 'typescript' },
+    { label: 'Java', value: 'java' },
     { label: 'JSON', value: 'json' },
     { label: 'Markdown', value: 'markdown' },
     { label: 'HTML', value: 'html' },
