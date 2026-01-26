@@ -143,6 +143,57 @@ export default function App() {
     editorRef.current = editor
     monacoRef.current = monaco
 
+    // Custom Monaco themes to match the app UI.
+    monaco.editor.defineTheme('textory-noir', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: '', foreground: 'E9EDF2' },
+        { token: 'comment', foreground: '7C8796' },
+        { token: 'string', foreground: 'B6FF4A' },
+        { token: 'number', foreground: '2EF2FF' },
+        { token: 'keyword', foreground: '9DA6FF' },
+        { token: 'type.identifier', foreground: 'FFD479' },
+      ],
+      colors: {
+        'editor.background': '#090A10',
+        'editor.foreground': '#E9EDF2',
+        'editorLineNumber.foreground': '#4E5664',
+        'editorLineNumber.activeForeground': '#B6FF4A',
+        'editorCursor.foreground': '#B6FF4A',
+        'editor.selectionBackground': '#1E2A1D',
+        'editor.inactiveSelectionBackground': '#182018',
+        'editor.findMatchBackground': '#2A2A12',
+        'editor.findMatchHighlightBackground': '#1D2A2A',
+        'editorIndentGuide.background1': '#1A1E29',
+        'editorIndentGuide.activeBackground1': '#2A3447',
+      },
+    })
+
+    monaco.editor.defineTheme('textory-paper', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        { token: '', foreground: '0B0C10' },
+        { token: 'comment', foreground: '68707D' },
+        { token: 'string', foreground: '0C7A55' },
+        { token: 'number', foreground: '1F6BFF' },
+        { token: 'keyword', foreground: '4A2AE3' },
+        { token: 'type.identifier', foreground: 'A33B00' },
+      ],
+      colors: {
+        'editor.background': '#FFFDF7',
+        'editor.foreground': '#0B0C10',
+        'editorLineNumber.foreground': '#9AA3AF',
+        'editorLineNumber.activeForeground': '#1F6BFF',
+        'editorCursor.foreground': '#1F6BFF',
+        'editor.selectionBackground': '#DCE8FF',
+        'editor.inactiveSelectionBackground': '#EEF4FF',
+        'editorIndentGuide.background1': '#E8E3D7',
+        'editorIndentGuide.activeBackground1': '#D2CCBF',
+      },
+    })
+
     // Register a Prettier-based formatter for common web languages.
     // This makes Monaco's built-in "Format Document" action work consistently.
     const register = (languageId) => {
@@ -258,6 +309,12 @@ export default function App() {
   // Apply theme to document
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme
+
+    // Keep Monaco aligned with the UI theme.
+    const monaco = monacoRef.current
+    if (monaco) {
+      monaco.editor.setTheme(settings.theme === 'dark' ? 'textory-noir' : 'textory-paper')
+    }
   }, [settings.theme])
 
   // Persist settings
@@ -679,7 +736,7 @@ export default function App() {
               path={`${activeDoc.id}/${activeDoc.name || 'document.txt'}`}
               language={activeDoc.language}
               value={activeDoc.value}
-              theme={settings.theme === 'dark' ? 'vs-dark' : 'vs'}
+              theme={settings.theme === 'dark' ? 'textory-noir' : 'textory-paper'}
               onMount={onEditorMount}
               onChange={(value) => {
                 updateActive({ value: value ?? '' })
