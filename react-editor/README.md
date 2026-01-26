@@ -13,8 +13,10 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Autosaves your open tabs to localStorage
 - Theme toggle (dark/light)
 - Font size, word wrap, minimap toggles
+- Help dialog (explains Wrap/Minimap + shortcuts)
+- Save As + Format button
 - Drag & drop a file onto the editor to open it
-- Status bar (words/chars/lines)
+- Status bar (words/chars/lines + cursor position)
 
 ## Run
 
@@ -32,8 +34,10 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - Ctrl+N: New tab
 - Ctrl+O: Open file
 - Ctrl+S: Save
+- Ctrl+Shift+S: Save As
 - Ctrl+F: Find (Monaco)
 - Ctrl+H: Replace (Monaco)
+- Ctrl+/: Help
 
 ## Notes
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import './monacoSetup'
 import './App.css'
+import LanguagePicker from './components/LanguagePicker'
 import { clearSettings, clearState, loadSettings, loadState, saveSettings, saveState } from './lib/storage'
 import { guessLanguageFromFilename, openTextFile, saveTextFile } from './lib/files'
 
@@ -49,6 +50,9 @@ export default function App() {
   const monacoRef = useRef(null)
   const editorRef = useRef(null)
 
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
+
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
 
   const [docs, setDocs] = useState(() => {
@@ -72,6 +76,19 @@ export default function App() {
   function onEditorMount(editor, monaco) {
     editorRef.current = editor
     monacoRef.current = monaco
+
+    // Keep cursor position updated for status bar.
+    setCursorPos({
+      line: editor.getPosition()?.lineNumber ?? 1,
+      col: editor.getPosition()?.column ?? 1,
+    })
+
+    editor.onDidChangeCursorPosition((e) => {
+      setCursorPos({
+        line: e.position?.lineNumber ?? 1,
+        col: e.position?.column ?? 1,
+      })
+    })
   }
 
   // Monaco doesn't always update an existing model's language just because the `language` prop changes.
@@ -160,10 +177,10 @@ export default function App() {
     }
   }
 
-  async function saveDoc() {
+  async function saveDoc({ saveAs = false } = {}) {
     if (!activeDoc) return
     try {
-      const existingHandle = fileHandlesRef.current.get(activeDoc.id) || null
+      const existingHandle = saveAs ? null : (fileHandlesRef.current.get(activeDoc.id) || null)
       const { handle } = await saveTextFile({
         suggestedName: activeDoc.name,
         text: activeDoc.value,
@@ -191,12 +208,27 @@ export default function App() {
     }
   }
 
+  function formatDoc() {
+    const editor = editorRef.current
+    if (!editor) return
+    // Monaco built-in formatting (e.g. JSON) if available.
+    editor.getAction('editor.action.formatDocument')?.run()
+      .then(() => toast('Formatted'))
+      .catch(() => toast('Format not available'))
+  }
+
   function renameDoc(docId) {
     const doc = docs.find(d => d.id === docId)
     if (!doc) return
     const next = prompt('Rename tab:', doc.name)
     if (!next) return
-    setDocs(prev => prev.map(d => (d.id === docId ? { ...d, name: next, updatedAt: Date.now() } : d)))
+
+    const guessed = guessLanguageFromFilename(next)
+    setDocs(prev => prev.map(d => {
+      if (d.id !== docId) return d
+      const nextLang = guessed === 'plaintext' ? d.language : guessed
+      return { ...d, name: next, language: nextLang, updatedAt: Date.now() }
+    }))
   }
 
   function closeDoc(docId) {
@@ -240,13 +272,18 @@ export default function App() {
       const k = e.key.toLowerCase()
       if (k === 's') {
         e.preventDefault()
-        saveDoc()
+        // Ctrl+Shift+S => Save As
+        saveDoc({ saveAs: e.shiftKey })
       } else if (k === 'o') {
         e.preventDefault()
         openDoc()
       } else if (k === 'n') {
         e.preventDefault()
         newDoc()
+      } else if (k === '/') {
+        // Ctrl+/ => Help
+        e.preventDefault()
+        setHelpOpen(true)
       }
     }
 
@@ -265,6 +302,16 @@ export default function App() {
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [docs])
+
+  // Close help on Escape
+  useEffect(() => {
+    if (!helpOpen) return
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setHelpOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [helpOpen])
 
   // Drag & drop open
   const dropRef = useRef(null)
@@ -327,23 +374,17 @@ export default function App() {
         <div className="toolbar" role="toolbar" aria-label="Editor toolbar">
           <button className="btn" type="button" onClick={newDoc} title="New (Ctrl+N)">New</button>
           <button className="btn" type="button" onClick={openDoc} title="Open (Ctrl+O)">Open</button>
-          <button className="btn btnPrimary" type="button" onClick={saveDoc} title="Save (Ctrl+S)">Save</button>
+          <button className="btn btnPrimary" type="button" onClick={() => saveDoc({ saveAs: false })} title="Save (Ctrl+S)">Save</button>
+          <button className="btn" type="button" onClick={() => saveDoc({ saveAs: true })} title="Save As (Ctrl+Shift+S)">Save As</button>
 
           <div className="divider" aria-hidden="true" />
 
-          <label className="field" title="Language">
-            <span className="fieldLabel">Lang</span>
-            <select
-              className="select"
-              value={activeDoc?.language || 'plaintext'}
-              onChange={(e) => updateActive({ language: e.target.value })}
-              disabled={!activeDoc}
-            >
-              {languageOptions.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
+          <LanguagePicker
+            value={activeDoc?.language || 'plaintext'}
+            options={languageOptions}
+            disabled={!activeDoc}
+            onChange={(next) => updateActive({ language: next })}
+          />
 
           <label className="field" title="Font size">
             <span className="fieldLabel">Size</span>
@@ -362,7 +403,7 @@ export default function App() {
             className="btn"
             type="button"
             onClick={() => setSettings({ wordWrap: settings.wordWrap === 'on' ? 'off' : 'on' })}
-            title="Toggle word wrap"
+            title="Wrap: on = long lines wrap to fit. off = horizontal scroll."
           >
             Wrap: {settings.wordWrap}
           </button>
@@ -371,9 +412,18 @@ export default function App() {
             className="btn"
             type="button"
             onClick={() => setSettings({ minimap: !settings.minimap })}
-            title="Toggle minimap"
+            title="Minimap: tiny overview map of your file on the right."
           >
             Minimap: {settings.minimap ? 'on' : 'off'}
+          </button>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={formatDoc}
+            title="Format document (Shift+Alt+F in Monaco)"
+          >
+            Format
           </button>
 
           <button
@@ -383,6 +433,15 @@ export default function App() {
             title="Toggle theme"
           >
             Theme
+          </button>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            title="Help (Ctrl+/)"
+          >
+            Help
           </button>
 
           <div className="divider" aria-hidden="true" />
@@ -477,6 +536,7 @@ export default function App() {
           <span className="pill">Words: {stats.words}</span>
           <span className="pill">Chars: {stats.chars}</span>
           <span className="pill">Lines: {stats.lines}</span>
+          <span className="pill">Ln {cursorPos.line}, Col {cursorPos.col}</span>
         </div>
         <div className="statusRight">
           <span className="pill">{activeDirty ? 'Unsaved' : 'Saved'}</span>
@@ -492,6 +552,61 @@ export default function App() {
         <span className="creditsSep">·</span>
         <a className="creditsLink" href="mailto:ritikkumar12bicbly@gmail.com">Email</a>
       </footer>
+
+      {helpOpen ? (
+        <div
+          className="modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Help"
+          onMouseDown={(e) => {
+            // click outside closes
+            if (e.target === e.currentTarget) setHelpOpen(false)
+          }}
+        >
+          <div className="modal">
+            <div className="modalHeader">
+              <div className="modalTitle">Textory Help</div>
+              <button className="btn" type="button" onClick={() => setHelpOpen(false)} title="Close (Esc)">Close</button>
+            </div>
+
+            <div className="modalBody">
+              <div className="helpGrid">
+                <div className="helpCard">
+                  <div className="helpCardTitle">Wrap</div>
+                  <div className="helpCardText">
+                    <b>on</b>: long lines wrap to fit your screen (no horizontal scroll).<br />
+                    <b>off</b>: lines stay on one line (use horizontal scroll).
+                  </div>
+                </div>
+                <div className="helpCard">
+                  <div className="helpCardTitle">Minimap</div>
+                  <div className="helpCardText">
+                    A tiny overview map of the file on the right. Useful to jump quickly to other parts.
+                  </div>
+                </div>
+                <div className="helpCard">
+                  <div className="helpCardTitle">Shortcuts</div>
+                  <div className="helpCardText">
+                    Ctrl+N: New tab<br />
+                    Ctrl+O: Open file<br />
+                    Ctrl+S: Save<br />
+                    Ctrl+Shift+S: Save As<br />
+                    Ctrl+F / Ctrl+H: Find / Replace (Monaco)<br />
+                    Ctrl+/: Help
+                  </div>
+                </div>
+                <div className="helpCard">
+                  <div className="helpCardTitle">Tip</div>
+                  <div className="helpCardText">
+                    Double-click a tab to rename it. If you rename to a known extension (like <code>main.py</code>), Textory auto-switches the language.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toastMsg ? <div className="toast" role="status" aria-live="polite">{toastMsg}</div> : null}
     </div>
