@@ -6,7 +6,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.Drawing.Drawing2D
 
 function New-RoundedRectPath {
 	param(
