@@ -61,8 +61,8 @@ function New-LogoBitmap {
 	$tilePath = New-RoundedRectPath -Rect $tileRect -Radius $tileRadius
 
 	# Gradient from (10,6) to (54,58)
-	$gradStart = New-Object System.Drawing.PointF (S 10), (S 6)
-	$gradEnd = New-Object System.Drawing.PointF (S 54), (S 58)
+	$gradStart = New-Object System.Drawing.PointF -ArgumentList (S 10), (S 6)
+	$gradEnd = New-Object System.Drawing.PointF -ArgumentList (S 54), (S 58)
 	$c1 = [System.Drawing.Color]::FromArgb(250, 0x5b, 0x8c, 0xff)
 	$c2 = [System.Drawing.Color]::FromArgb(235, 0xff, 0x5b, 0x6a)
 	$bgBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($gradStart, $gradEnd, $c1, $c2)
@@ -70,8 +70,8 @@ function New-LogoBitmap {
 
 	# Subtle highlight
 	$hlBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-		(New-Object System.Drawing.PointF (S 12), (S 10)),
-		(New-Object System.Drawing.PointF (S 54), (S 54)),
+		(New-Object System.Drawing.PointF -ArgumentList (S 12), (S 10)),
+		(New-Object System.Drawing.PointF -ArgumentList (S 54), (S 54)),
 		([System.Drawing.Color]::FromArgb(30, 255, 255, 255)),
 		([System.Drawing.Color]::FromArgb(0, 255, 255, 255))
 	)
@@ -82,8 +82,8 @@ function New-LogoBitmap {
 	$pageRadius = (S 4)
 	$pagePath = New-RoundedRectPath -Rect $pageRect -Radius $pageRadius
 
-	$shineStart = New-Object System.Drawing.PointF (S 18), (S 14)
-	$shineEnd = New-Object System.Drawing.PointF (S 46), (S 50)
+	$shineStart = New-Object System.Drawing.PointF -ArgumentList (S 18), (S 14)
+	$shineEnd = New-Object System.Drawing.PointF -ArgumentList (S 46), (S 50)
 	$pageBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
 		$shineStart,
 		$shineEnd,
@@ -97,9 +97,9 @@ function New-LogoBitmap {
 	$fx = $pageRect.Right - (S 8)
 	$fy = $pageRect.Y
 	$fold.AddPolygon(@(
-		(New-Object System.Drawing.PointF $fx $fy),
-		(New-Object System.Drawing.PointF $pageRect.Right $fy),
-		(New-Object System.Drawing.PointF $pageRect.Right ($fy + (S 8)))
+		(New-Object System.Drawing.PointF -ArgumentList $fx, $fy),
+		(New-Object System.Drawing.PointF -ArgumentList $pageRect.Right, $fy),
+		(New-Object System.Drawing.PointF -ArgumentList $pageRect.Right, ($fy + (S 8)))
 	))
 	$foldBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(140, 255, 255, 255))
 	$g.FillPath($foldBrush, $fold)
@@ -122,10 +122,10 @@ function New-LogoBitmap {
 	# Pen nib accent
 	$nib = New-Object System.Drawing.Drawing2D.GraphicsPath
 	$nib.AddPolygon(@(
-		(New-Object System.Drawing.PointF (S 41.5) (S 40.5)),
-		(New-Object System.Drawing.PointF (S 47.1) (S 46.1)),
-		(New-Object System.Drawing.PointF (S 44.8) (S 48.4)),
-		(New-Object System.Drawing.PointF (S 39.2) (S 42.8))
+		(New-Object System.Drawing.PointF -ArgumentList (S 41.5), (S 40.5)),
+		(New-Object System.Drawing.PointF -ArgumentList (S 47.1), (S 46.1)),
+		(New-Object System.Drawing.PointF -ArgumentList (S 44.8), (S 48.4)),
+		(New-Object System.Drawing.PointF -ArgumentList (S 39.2), (S 42.8))
 	))
 	$nibBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(140, 0x0d, 0x13, 0x24))
 	$g.FillPath($nibBrush, $nib)
