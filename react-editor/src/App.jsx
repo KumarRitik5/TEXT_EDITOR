@@ -572,7 +572,7 @@ export default function App() {
     <div className="app" ref={dropRef}>
       <header className="topbar">
         <div className="brand">
-          <div className="logo" aria-hidden="true">T</div>
+          <div className="logo" aria-hidden="true" />
           <div className="brandText">
             <div className="title">Textory</div>
             <div className="subtitle">

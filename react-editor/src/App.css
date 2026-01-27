@@ -89,17 +89,14 @@ body{
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
+  display: block;
   background:
-    radial-gradient(28px 28px at 28% 30%, rgba(158,227,182,0.45), transparent 62%),
-    radial-gradient(30px 30px at 78% 70%, rgba(143,183,255,0.32), transparent 62%),
-    linear-gradient(145deg, rgba(255,255,255,0.075), rgba(255,255,255,0.02));
+    url("/textory.svg") center / 92% 92% no-repeat,
+    radial-gradient(28px 28px at 28% 30%, rgba(158,227,182,0.18), transparent 62%),
+    radial-gradient(30px 30px at 78% 70%, rgba(143,183,255,0.14), transparent 62%),
+    linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   border: 1px solid var(--border);
   box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-  font-family: var(--display);
-  font-weight: 900;
-  letter-spacing: 0.02em;
 }
 
 .brandText .title{ font-family: var(--display); font-weight: 900; letter-spacing: -0.02em; }
