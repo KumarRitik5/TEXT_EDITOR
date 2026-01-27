@@ -116,7 +116,7 @@ export default function App() {
   const vimModeRef = useRef(null)
   const vimStatusRef = useRef(null)
 
-  const [helpOpen, setHelpOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
 
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
@@ -490,9 +490,9 @@ export default function App() {
         e.preventDefault()
         newDoc()
       } else if (k === '/') {
-        // Ctrl+/ => Help
+        // Ctrl+/ => Settings
         e.preventDefault()
-        setHelpOpen(true)
+        setSettingsOpen(true)
       }
     }
 
@@ -512,15 +512,15 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [docs])
 
-  // Close help on Escape
+  // Close settings on Escape
   useEffect(() => {
-    if (!helpOpen) return
+    if (!settingsOpen) return
     function onKeyDown(e) {
-      if (e.key === 'Escape') setHelpOpen(false)
+      if (e.key === 'Escape') setSettingsOpen(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [helpOpen])
+  }, [settingsOpen])
 
   // Drag & drop open
   const dropRef = useRef(null)
@@ -585,25 +585,6 @@ export default function App() {
           <button className="btn" type="button" onClick={newDoc} title="New (Ctrl+N)">New</button>
           <button className="btn" type="button" onClick={openDoc} title="Open (Ctrl+O)">Open</button>
           <button className="btn btnPrimary" type="button" onClick={() => saveDoc({ saveAs: false })} title="Save (Ctrl+S)">Save</button>
-          <button className="btn" type="button" onClick={() => saveDoc({ saveAs: true })} title="Save As (Ctrl+Shift+S)">Save As</button>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => setSettings({ formatOnSave: !settings.formatOnSave })}
-            title="Automatically formats supported files on Save"
-          >
-            Format on Save: {settings.formatOnSave ? 'on' : 'off'}
-          </button>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => setSettings({ vimMode: !settings.vimMode })}
-            title="Toggle Vim motions (Esc to Normal mode)"
-          >
-            Vim: {settings.vimMode ? 'on' : 'off'}
-          </button>
 
           <div className="divider" aria-hidden="true" />
 
@@ -614,82 +595,17 @@ export default function App() {
             onChange={(next) => updateActive({ language: next })}
           />
 
-          <label className="field" title="Font size">
-            <span className="fieldLabel">Size</span>
-            <input
-              className="input"
-              type="number"
-              min="10"
-              max="36"
-              step="1"
-              value={settings.fontSize}
-              onChange={(e) => setSettings({ fontSize: Math.max(10, Math.min(36, Number(e.target.value) || 16)) })}
-            />
-          </label>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => setSettings({ wordWrap: settings.wordWrap === 'on' ? 'off' : 'on' })}
-            title="Wrap: on = long lines wrap to fit. off = horizontal scroll."
-          >
-            Wrap: {settings.wordWrap}
-          </button>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={() => setSettings({ minimap: !settings.minimap })}
-            title="Minimap: tiny overview map of your file on the right."
-          >
-            Minimap: {settings.minimap ? 'on' : 'off'}
-          </button>
-
-          <button
-            className="btn"
-            type="button"
-            onClick={formatDoc}
-            title="Format document (Shift+Alt+F in Monaco)"
-          >
-            Format
-          </button>
-
           <button
             className="btn"
             type="button"
             onClick={() => setSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
             title="Toggle theme"
           >
-            Theme
+            {settings.theme === 'dark' ? 'Dark' : 'Light'}
           </button>
 
-          <button
-            className="btn"
-            type="button"
-            onClick={() => setHelpOpen(true)}
-            title="Help (Ctrl+/)"
-          >
-            Help
-          </button>
-
-          <div className="divider" aria-hidden="true" />
-
-          <button
-            className="btn btnDanger"
-            type="button"
-            onClick={() => {
-              if (!confirm('Clear autosave + settings?')) return
-              clearState()
-              clearSettings()
-              setSettingsState({ ...DEFAULT_SETTINGS })
-              const fresh = createDoc({ name: 'Untitled 1', language: 'plaintext', value: '' })
-              setDocs([fresh])
-              setActiveId(fresh.id)
-              toast('Cleared local data')
-            }}
-            title="Clear saved state"
-          >
-            Clear
+          <button className="btn" type="button" onClick={() => setSettingsOpen(true)} title="Settings (Ctrl+/)">
+            Settings
           </button>
         </div>
       </header>
@@ -767,10 +683,8 @@ export default function App() {
 
       <footer className="statusbar" aria-label="Status bar">
         <div className="statusLeft">
-          <span className="pill">Words: {stats.words}</span>
-          <span className="pill">Chars: {stats.chars}</span>
-          <span className="pill">Lines: {stats.lines}</span>
           <span className="pill">Ln {cursorPos.line}, Col {cursorPos.col}</span>
+          <span className="pill">Words: {stats.words}</span>
         </div>
         <div className="statusRight">
           <span
@@ -780,51 +694,95 @@ export default function App() {
             aria-label="Vim status"
           />
           <span className="pill">{activeDirty ? 'Unsaved' : 'Saved'}</span>
-          <span className="pill">Last edit: {activeDoc?.updatedAt ? formatTimestamp(activeDoc.updatedAt) : '--:--'}</span>
-          <span className="pill">Find/Replace: Ctrl+F / Ctrl+H</span>
+          <span className="pill">{activeDoc?.language || 'plaintext'}</span>
         </div>
       </footer>
 
-      <footer className="credits" aria-label="Developer credits">
-        <span>© 2026 Textory · Built by Ritik Kumar</span>
-        <span className="creditsSep">·</span>
-        <a className="creditsLink" href="https://github.com/KumarRitik5" target="_blank" rel="noreferrer">GitHub</a>
-        <span className="creditsSep">·</span>
-        <a className="creditsLink" href="mailto:ritikkumar12bicbly@gmail.com">Email</a>
-      </footer>
-
-      {helpOpen ? (
+      {settingsOpen ? (
         <div
           className="modalOverlay"
           role="dialog"
           aria-modal="true"
-          aria-label="Help"
+          aria-label="Settings"
           onMouseDown={(e) => {
-            // click outside closes
-            if (e.target === e.currentTarget) setHelpOpen(false)
+            if (e.target === e.currentTarget) setSettingsOpen(false)
           }}
         >
           <div className="modal">
             <div className="modalHeader">
-              <div className="modalTitle">Textory Help</div>
-              <button className="btn" type="button" onClick={() => setHelpOpen(false)} title="Close (Esc)">Close</button>
+              <div className="modalTitle">Settings</div>
+              <button className="btn" type="button" onClick={() => setSettingsOpen(false)} title="Close (Esc)">Close</button>
             </div>
 
             <div className="modalBody">
-              <div className="helpGrid">
+              <div className="settingsGrid">
                 <div className="helpCard">
-                  <div className="helpCardTitle">Wrap</div>
+                  <div className="helpCardTitle">Editor</div>
                   <div className="helpCardText">
-                    <b>on</b>: long lines wrap to fit your screen (no horizontal scroll).<br />
-                    <b>off</b>: lines stay on one line (use horizontal scroll).
+                    <div className="settingsRow">
+                      <label className="field" title="Font size">
+                        <span className="fieldLabel">Font</span>
+                        <input
+                          className="input"
+                          type="number"
+                          min="10"
+                          max="36"
+                          step="1"
+                          value={settings.fontSize}
+                          onChange={(e) => setSettings({ fontSize: Math.max(10, Math.min(36, Number(e.target.value) || 16)) })}
+                        />
+                      </label>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setSettings({ wordWrap: settings.wordWrap === 'on' ? 'off' : 'on' })}
+                        title="Wrap: on = wrap long lines, off = horizontal scroll"
+                      >
+                        Wrap: {settings.wordWrap}
+                      </button>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setSettings({ minimap: !settings.minimap })}
+                        title="Toggle minimap"
+                      >
+                        Minimap: {settings.minimap ? 'on' : 'off'}
+                      </button>
+                    </div>
+
+                    <div className="settingsRow">
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setSettings({ formatOnSave: !settings.formatOnSave })}
+                        title="Automatically formats supported files on Save"
+                      >
+                        Format on Save: {settings.formatOnSave ? 'on' : 'off'}
+                      </button>
+
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setSettings({ vimMode: !settings.vimMode })}
+                        title="Toggle Vim motions (Esc to Normal mode)"
+                      >
+                        Vim: {settings.vimMode ? 'on' : 'off'}
+                      </button>
+                    </div>
+
+                    <div className="settingsRow">
+                      <button className="btn" type="button" onClick={formatDoc} title="Format document (Shift+Alt+F)">
+                        Format Document
+                      </button>
+                      <button className="btn" type="button" onClick={() => saveDoc({ saveAs: true })} title="Save As (Ctrl+Shift+S)">
+                        Save As
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="helpCard">
-                  <div className="helpCardTitle">Minimap</div>
-                  <div className="helpCardText">
-                    A tiny overview map of the file on the right. Useful to jump quickly to other parts.
-                  </div>
-                </div>
+
                 <div className="helpCard">
                   <div className="helpCardTitle">Shortcuts</div>
                   <div className="helpCardText">
@@ -832,14 +790,43 @@ export default function App() {
                     Ctrl+O: Open file<br />
                     Ctrl+S: Save<br />
                     Ctrl+Shift+S: Save As<br />
-                    Ctrl+F / Ctrl+H: Find / Replace (Monaco)<br />
-                    Ctrl+/: Help
+                    Ctrl+F / Ctrl+H: Find / Replace<br />
+                    Ctrl+/: Settings
                   </div>
                 </div>
+
                 <div className="helpCard">
-                  <div className="helpCardTitle">Tip</div>
+                  <div className="helpCardTitle">About</div>
                   <div className="helpCardText">
-                    Double-click a tab to rename it. If you rename to a known extension (like <code>main.py</code>), Textory auto-switches the language.
+                    Double-click a tab to rename it. Renaming to a known extension (like <code>main.py</code>) auto-switches language.
+                    <div className="settingsRow">
+                      <a className="creditsLink" href="https://github.com/KumarRitik5" target="_blank" rel="noreferrer">GitHub</a>
+                      <a className="creditsLink" href="mailto:ritikkumar12bicbly@gmail.com">Email</a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="helpCard">
+                  <div className="helpCardTitle">Danger Zone</div>
+                  <div className="helpCardText">
+                    <button
+                      className="btn btnDanger"
+                      type="button"
+                      onClick={() => {
+                        if (!confirm('Clear autosave + settings?')) return
+                        clearState()
+                        clearSettings()
+                        setSettingsState({ ...DEFAULT_SETTINGS })
+                        const fresh = createDoc({ name: 'Untitled 1', language: 'plaintext', value: '' })
+                        setDocs([fresh])
+                        setActiveId(fresh.id)
+                        toast('Cleared local data')
+                        setSettingsOpen(false)
+                      }}
+                      title="Clear saved state"
+                    >
+                      Clear Local Data
+                    </button>
                   </div>
                 </div>
               </div>
