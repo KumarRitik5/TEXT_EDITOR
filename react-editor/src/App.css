@@ -1,22 +1,23 @@
 :root{
-  /* Art direction: ink-noir surfaces + neon-citrus accents + editorial typography */
-  --bg: #090a0f;
-  --bg2: #0d101a;
-  --panel: rgba(255,255,255,0.06);
+  /* Dark theme (default): midnight glass + soft aurora accents */
+  --bg: #0a0e1a;
+  --bg2: #0f1830;
+  --panel: rgba(255,255,255,0.055);
   --panel2: rgba(255,255,255,0.085);
-  --text: rgba(255,255,255,0.92);
-  --muted: rgba(255,255,255,0.68);
-  --border: rgba(255,255,255,0.12);
-  --primary: #9ee3b6; /* soft mint */
-  --primary2: #8fb7ff; /* soft sky */
-  --danger: #ff6f8f;
-  --shadow: 0 18px 70px rgba(0,0,0,0.55);
+  --text: rgba(244,247,255,0.93);
+  --muted: rgba(196,208,234,0.74);
+  --border: rgba(195,210,255,0.14);
+  --primary: #a6c8ff; /* soft periwinkle */
+  --primary2: #b8f3d2; /* soft mint */
+  --danger: #ff7aa2;
+  --shadow: 0 22px 86px rgba(0,0,0,0.55);
   --radius: 18px;
-  --ring: rgba(158,227,182,0.32);
-  --ringDanger: rgba(255,111,143,0.30);
+  --ring: rgba(166,200,255,0.30);
+  --ringDanger: rgba(255,122,162,0.26);
 
   --display: "Unbounded", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   --body: "Newsreader", ui-serif, Georgia, "Times New Roman", serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
 }
 
 :root[data-theme="light"]{
@@ -33,6 +34,8 @@
   --shadow: 0 18px 70px rgba(10,10,12,0.16);
   --ring: rgba(31,107,255,0.30);
   --ringDanger: rgba(212,24,59,0.28);
+
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
 }
 
 *{ box-sizing: border-box; }
@@ -42,9 +45,9 @@ body{
   margin: 0;
   font-family: var(--body);
   background:
-    radial-gradient(920px 580px at 14% 12%, rgba(158,227,182,0.085), transparent 66%),
-    radial-gradient(820px 540px at 92% 18%, rgba(143,183,255,0.075), transparent 64%),
-    radial-gradient(900px 700px at 70% 98%, rgba(255,111,143,0.065), transparent 58%),
+    radial-gradient(980px 640px at 12% 10%, rgba(166,200,255,0.11), transparent 64%),
+    radial-gradient(920px 600px at 92% 18%, rgba(184,243,210,0.09), transparent 62%),
+    radial-gradient(980px 820px at 60% 102%, rgba(255,122,162,0.06), transparent 58%),
     linear-gradient(180deg, var(--bg), var(--bg2));
   color: var(--text);
   background-attachment: fixed;
@@ -86,6 +89,11 @@ body::before{
   background: rgba(255,255,255,0.03);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
+}
+
+:root[data-theme="dark"] .topbar{
+  background: rgba(16,22,38,0.58);
+  backdrop-filter: blur(14px);
 }
 
 :root[data-theme="light"] .topbar{
@@ -154,8 +162,8 @@ body::before{
   outline-offset: 2px;
 }
 .btnPrimary{
-  background: rgba(158,227,182,0.12);
-  border-color: rgba(158,227,182,0.30);
+  background: rgba(166,200,255,0.14);
+  border-color: rgba(166,200,255,0.30);
 }
 :root[data-theme="light"] .btnPrimary{
   background: rgba(31,107,255,0.12);
@@ -164,6 +172,11 @@ body::before{
 .btnDanger{
   background: rgba(255,91,106,0.16);
   border-color: rgba(255,91,106,0.40);
+}
+
+:root[data-theme="dark"] .btnDanger{
+  background: rgba(255,122,162,0.14);
+  border-color: rgba(255,122,162,0.32);
 }
 
 .btnDanger:focus-visible{
@@ -209,7 +222,7 @@ body::before{
 
 /* Some browsers honor option styling; keep it gentle if they do. */
 :root[data-theme="dark"] option{
-  background-color: #101a33;
+  background-color: #0f162b;
   color: var(--text);
 }
 
@@ -255,7 +268,7 @@ body::before{
   width: min(340px, 72vw);
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(16,18,26,0.82);
+  background: rgba(14,18,32,0.84);
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -302,7 +315,11 @@ body::before{
 .lpItem:hover{ background: var(--panel2); }
 
 .lpItemActive{
-  background: rgba(91,140,255,0.18);
+  background: rgba(166,200,255,0.14);
+}
+
+:root[data-theme="light"] .lpItemActive{
+  background: rgba(31,107,255,0.12);
 }
 
 .lpItemLabel{ font-weight: 900; }
@@ -321,6 +338,10 @@ body::before{
   background: rgba(255,255,255,0.02);
   backdrop-filter: blur(10px);
   overflow: auto;
+}
+
+:root[data-theme="dark"] .tabs{
+  background: rgba(16,22,38,0.50);
 }
 
 :root[data-theme="light"] .tabs{
@@ -345,8 +366,8 @@ body::before{
 .tab:active{ transform: translateY(1px); }
 
 .tabActive{
-  background: rgba(91,140,255,0.16);
-  border-color: rgba(91,140,255,0.35);
+  background: rgba(166,200,255,0.12);
+  border-color: rgba(166,200,255,0.26);
 }
 
 :root[data-theme="light"] .tabActive{
@@ -388,6 +409,14 @@ body::before{
   box-shadow: 0 18px 70px rgba(0,0,0,0.30);
 }
 
+:root[data-theme="dark"] .editorFrame{
+  background:
+    radial-gradient(980px 560px at 10% 10%, rgba(166,200,255,0.08), transparent 60%),
+    radial-gradient(980px 720px at 92% 0%, rgba(184,243,210,0.06), transparent 62%),
+    rgba(255,255,255,0.032);
+  box-shadow: 0 26px 96px rgba(0,0,0,0.48);
+}
+
 .statusbar{
   display: flex;
   gap: 14px;
@@ -397,6 +426,10 @@ body::before{
   border-top: 1px solid var(--border);
   background: rgba(255,255,255,0.02);
   backdrop-filter: blur(10px);
+}
+
+:root[data-theme="dark"] .statusbar{
+  background: rgba(16,22,38,0.50);
 }
 
 .credits{
