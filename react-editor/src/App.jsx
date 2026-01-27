@@ -139,11 +139,9 @@ export default function App() {
     return pick
   }, [docs, activeId])
 
-  function onEditorMount(editor, monaco) {
-    editorRef.current = editor
-    monacoRef.current = monaco
-
-    // Custom Monaco themes to match the app UI.
+  function onBeforeEditorMount(monaco) {
+    // Define themes *before* the editor is created.
+    // Otherwise Monaco can fall back to its default light theme on first paint.
     monaco.editor.defineTheme('textory-noir', {
       base: 'vs-dark',
       inherit: true,
@@ -193,6 +191,11 @@ export default function App() {
         'editorIndentGuide.activeBackground1': '#D2CCBF',
       },
     })
+  }
+
+  function onEditorMount(editor, monaco) {
+    editorRef.current = editor
+    monacoRef.current = monaco
 
     // Register a Prettier-based formatter for common web languages.
     // This makes Monaco's built-in "Format Document" action work consistently.
@@ -737,6 +740,7 @@ export default function App() {
               language={activeDoc.language}
               value={activeDoc.value}
               theme={settings.theme === 'dark' ? 'textory-noir' : 'textory-paper'}
+              beforeMount={onBeforeEditorMount}
               onMount={onEditorMount}
               onChange={(value) => {
                 updateActive({ value: value ?? '' })
