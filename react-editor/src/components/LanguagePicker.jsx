@@ -46,7 +46,6 @@ export default function LanguagePicker({
 
   useEffect(() => {
     if (!open) return
-    setQuery('')
     // Focus search after popover opens.
     const t = setTimeout(() => inputRef.current?.focus(), 0)
     return () => clearTimeout(t)
@@ -64,7 +63,11 @@ export default function LanguagePicker({
         className="lpButton"
         onClick={() => {
           if (disabled) return
-          setOpen(v => !v)
+          setOpen(v => {
+            const next = !v
+            if (next) setQuery('')
+            return next
+          })
         }}
         aria-haspopup="dialog"
         aria-expanded={open}

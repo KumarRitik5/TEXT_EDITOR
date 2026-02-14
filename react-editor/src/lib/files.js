@@ -12,7 +12,19 @@ export async function openTextFile() {
         {
           description: 'Text files',
           accept: {
-            'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py', '.java'],
+            'text/plain': [
+              '.txt', '.md', '.mdx', '.json',
+              '.js', '.mjs', '.cjs', '.jsx',
+              '.ts', '.mts', '.cts', '.tsx',
+              '.html', '.css',
+              '.py', '.java',
+              '.c', '.h', '.cpp', '.cc', '.cxx', '.hpp',
+              '.cs', '.go', '.rs', '.php',
+              '.sh', '.bash', '.zsh',
+              '.yml', '.yaml',
+              '.xml', '.svg',
+              '.sql',
+            ],
           },
         },
       ],
@@ -30,7 +42,7 @@ export async function openTextFile() {
   // Fallback: hidden input element
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.txt,.md,.json,.js,.ts,.jsx,.tsx,.html,.css,.py,.java,text/plain';
+  input.accept = '.txt,.md,.mdx,.json,.js,.mjs,.cjs,.jsx,.ts,.mts,.cts,.tsx,.html,.css,.py,.java,.c,.h,.cpp,.cc,.cxx,.hpp,.cs,.go,.rs,.php,.sh,.bash,.zsh,.yml,.yaml,.xml,.svg,.sql,text/plain';
 
   const file = await new Promise((resolve, reject) => {
     input.addEventListener('change', () => resolve(input.files?.[0] ?? null), { once: true });
@@ -50,7 +62,21 @@ export async function saveTextFile({ suggestedName, text, existingHandle }) {
       types: [
         {
           description: 'Text files',
-          accept: { 'text/plain': ['.txt', '.md', '.json', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.py', '.java'] },
+          accept: {
+            'text/plain': [
+              '.txt', '.md', '.mdx', '.json',
+              '.js', '.mjs', '.cjs', '.jsx',
+              '.ts', '.mts', '.cts', '.tsx',
+              '.html', '.css',
+              '.py', '.java',
+              '.c', '.h', '.cpp', '.cc', '.cxx', '.hpp',
+              '.cs', '.go', '.rs', '.php',
+              '.sh', '.bash', '.zsh',
+              '.yml', '.yaml',
+              '.xml', '.svg',
+              '.sql',
+            ],
+          },
         },
       ],
     });
@@ -78,15 +104,25 @@ export async function saveTextFile({ suggestedName, text, existingHandle }) {
 
 export function guessLanguageFromFilename(name) {
   const lower = (name || '').toLowerCase();
-  if (lower.endsWith('.js')) return 'javascript';
+  if (lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'javascript';
   if (lower.endsWith('.jsx')) return 'javascript';
-  if (lower.endsWith('.ts')) return 'typescript';
+  if (lower.endsWith('.ts') || lower.endsWith('.mts') || lower.endsWith('.cts')) return 'typescript';
   if (lower.endsWith('.tsx')) return 'typescript';
   if (lower.endsWith('.json')) return 'json';
-  if (lower.endsWith('.md')) return 'markdown';
+  if (lower.endsWith('.md') || lower.endsWith('.mdx')) return 'markdown';
   if (lower.endsWith('.html')) return 'html';
   if (lower.endsWith('.css')) return 'css';
   if (lower.endsWith('.py')) return 'python';
   if (lower.endsWith('.java')) return 'java';
+  if (lower.endsWith('.c') || lower.endsWith('.h')) return 'cpp';
+  if (lower.endsWith('.cpp') || lower.endsWith('.cc') || lower.endsWith('.cxx') || lower.endsWith('.hpp')) return 'cpp';
+  if (lower.endsWith('.cs')) return 'csharp';
+  if (lower.endsWith('.go')) return 'go';
+  if (lower.endsWith('.rs')) return 'rust';
+  if (lower.endsWith('.php')) return 'php';
+  if (lower.endsWith('.sh') || lower.endsWith('.bash') || lower.endsWith('.zsh')) return 'shell';
+  if (lower.endsWith('.yml') || lower.endsWith('.yaml')) return 'yaml';
+  if (lower.endsWith('.xml') || lower.endsWith('.svg')) return 'xml';
+  if (lower.endsWith('.sql')) return 'sql';
   return 'plaintext';
 }

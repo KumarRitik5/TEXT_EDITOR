@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { initVimMode } from 'monaco-vim'
 import './monacoSetup'
@@ -100,14 +100,6 @@ function countStats(text) {
   return { words, chars, lines }
 }
 
-function formatTimestamp(ts) {
-  try {
-    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return ''
-  }
-}
-
 export default function App() {
   const fileHandlesRef = useRef(new Map()) // docId -> FileSystemFileHandle
 
@@ -130,6 +122,7 @@ export default function App() {
   const [activeId, setActiveId] = useState(() => {
     const state = loadState()
     if (state?.activeId) return state.activeId
+    if (state?.docs?.[0]?.id) return state.docs[0].id
     return null
   })
 
@@ -139,7 +132,35 @@ export default function App() {
     return pick
   }, [docs, activeId])
 
+  const [toastMsg, setToastMsg] = useState('')
+  const toastTimer = useRef(null)
+  const toast = useCallback((message) => {
+    setToastMsg(message)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToastMsg(''), 1600)
+  }, [])
+
+  const setSettings = useCallback((patch) => {
+    setSettingsState(s => ({ ...s, ...patch }))
+  }, [])
+
   function onBeforeEditorMount(monaco) {
+    // Ensure JSX/TSX tokenize well when editing React files.
+    try {
+      const ts = monaco.languages?.typescript
+      if (ts?.javascriptDefaults && ts?.typescriptDefaults && ts?.JsxEmit) {
+        const base = {
+          allowNonTsExtensions: true,
+          target: ts.ScriptTarget?.ES2020 ?? undefined,
+          jsx: ts.JsxEmit.ReactJSX,
+        }
+        ts.javascriptDefaults.setCompilerOptions(base)
+        ts.typescriptDefaults.setCompilerOptions(base)
+      }
+    } catch {
+      // ignore
+    }
+
     // Define themes *before* the editor is created.
     // Otherwise Monaco can fall back to its default light theme on first paint.
     monaco.editor.defineTheme('textory-noir', {
@@ -254,6 +275,8 @@ export default function App() {
     const editor = editorRef.current
     if (!editor) return
 
+    const statusEl = vimStatusRef.current
+
     // Dispose any previous instance before (re)initializing.
     if (vimModeRef.current) {
       try { vimModeRef.current.dispose() } catch { /* ignore */ }
@@ -261,17 +284,20 @@ export default function App() {
     }
 
     if (!settings.vimMode) {
-      if (vimStatusRef.current) vimStatusRef.current.textContent = ''
+      if (statusEl) statusEl.textContent = ''
       return
     }
 
     // Status node is optional but makes Vim feel much more usable.
-    const statusNode = vimStatusRef.current || undefined
+    const statusNode = statusEl || undefined
     try {
       vimModeRef.current = initVimMode(editor, statusNode)
     } catch {
-      toast('Vim mode not available')
-      setSettings({ vimMode: false })
+      // Avoid sync state updates inside effects (eslint rule).
+      setTimeout(() => {
+        toast('Vim mode not available')
+        setSettings({ vimMode: false })
+      }, 0)
     }
 
     return () => {
@@ -279,9 +305,9 @@ export default function App() {
         try { vimModeRef.current.dispose() } catch { /* ignore */ }
         vimModeRef.current = null
       }
-      if (vimStatusRef.current) vimStatusRef.current.textContent = ''
+      if (statusEl) statusEl.textContent = ''
     }
-  }, [settings.vimMode])
+  }, [settings.vimMode, setSettings, toast])
 
   // Monaco doesn't always update an existing model's language just because the `language` prop changes.
   // Force it whenever the active tab or language changes.
@@ -293,21 +319,9 @@ export default function App() {
     const model = editor.getModel()
     if (!model) return
     monaco.editor.setModelLanguage(model, activeDoc.language || 'plaintext')
-  }, [activeDoc?.id, activeDoc?.language])
-
-  useEffect(() => {
-    if (!activeId && docs[0]) setActiveId(docs[0].id)
-  }, [activeId, docs])
+  }, [activeDoc])
 
   const activeDirty = !!activeDoc && activeDoc.value !== activeDoc.savedValue
-
-  const [toastMsg, setToastMsg] = useState('')
-  const toastTimer = useRef(null)
-  function toast(message) {
-    setToastMsg(message)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToastMsg(''), 1600)
-  }
 
   // Apply theme to document
   useEffect(() => {
@@ -346,19 +360,15 @@ export default function App() {
     return () => clearTimeout(autosaveTimer.current)
   }, [docs, activeDoc?.id])
 
-  function setSettings(patch) {
-    setSettingsState(s => ({ ...s, ...patch }))
-  }
-
-  function newDoc() {
+  const newDoc = useCallback(() => {
     const n = docs.filter(d => d.name.startsWith('Untitled')).length + 1
     const doc = createDoc({ name: `Untitled ${n}`, language: 'plaintext', value: '' })
     setDocs(prev => [...prev, doc])
     setActiveId(doc.id)
     toast('New document')
-  }
+  }, [docs, toast])
 
-  async function openDoc() {
+  const openDoc = useCallback(async () => {
     try {
       const { name, text, handle } = await openTextFile()
       const language = guessLanguageFromFilename(name)
@@ -373,9 +383,9 @@ export default function App() {
       if (name === 'AbortError' || msg.toLowerCase().includes('cancel')) return
       toast('Open failed')
     }
-  }
+  }, [toast])
 
-  async function saveDoc({ saveAs = false } = {}) {
+  const saveDoc = useCallback(async ({ saveAs = false } = {}) => {
     if (!activeDoc) return
     try {
       if (settings.formatOnSave) {
@@ -415,7 +425,7 @@ export default function App() {
       if (name === 'AbortError' || msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('cancel')) return
       toast('Save failed')
     }
-  }
+  }, [activeDoc, settings.formatOnSave, toast])
 
   function formatDoc() {
     const editor = editorRef.current
@@ -498,7 +508,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeDoc, docs])
+  }, [newDoc, openDoc, saveDoc])
 
   // Warn on unload if any doc dirty
   useEffect(() => {
@@ -552,7 +562,7 @@ export default function App() {
       node.removeEventListener('dragover', onDragOver)
       node.removeEventListener('drop', onDrop)
     }
-  }, [docs])
+  }, [toast])
 
   const stats = useMemo(() => countStats(activeDoc?.value || ''), [activeDoc?.value])
 
@@ -566,6 +576,15 @@ export default function App() {
     { label: 'HTML', value: 'html' },
     { label: 'CSS', value: 'css' },
     { label: 'Python', value: 'python' },
+    { label: 'C/C++', value: 'cpp' },
+    { label: 'C#', value: 'csharp' },
+    { label: 'Go', value: 'go' },
+    { label: 'Rust', value: 'rust' },
+    { label: 'PHP', value: 'php' },
+    { label: 'Shell', value: 'shell' },
+    { label: 'YAML', value: 'yaml' },
+    { label: 'XML', value: 'xml' },
+    { label: 'SQL', value: 'sql' },
   ]
 
   return (
