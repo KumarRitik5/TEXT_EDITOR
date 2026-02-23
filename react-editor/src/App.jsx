@@ -6,7 +6,6 @@ import './App.css'
 import LanguagePicker from './components/LanguagePicker'
 import { clearSettings, clearState, loadSettings, loadState, saveSettings, saveState } from './lib/storage'
 import { guessLanguageFromFilename, openTextFile, saveTextFile } from './lib/files'
-import { checkGrammarMistakes } from './lib/grammar'
 
 const DEFAULT_SETTINGS = {
   theme: 'dark',
@@ -437,39 +436,6 @@ export default function App() {
       .catch(() => toast('Format not available'))
   }
 
-  const runGrammarCheck = useCallback(() => {
-    const editor = editorRef.current
-    const monaco = monacoRef.current
-    if (!editor || !monaco || !activeDoc) return
-
-    const model = editor.getModel()
-    if (!model) return
-
-    const issues = checkGrammarMistakes(activeDoc.value)
-    const markers = issues.map((issue) => {
-      const start = model.getPositionAt(issue.start)
-      const end = model.getPositionAt(issue.end)
-      return {
-        severity: monaco.MarkerSeverity.Warning,
-        message: issue.message,
-        source: 'grammar',
-        startLineNumber: start.lineNumber,
-        startColumn: start.column,
-        endLineNumber: end.lineNumber,
-        endColumn: Math.max(end.column, start.column + 1),
-      }
-    })
-
-    monaco.editor.setModelMarkers(model, 'grammar-check', markers)
-
-    if (markers.length === 0) {
-      toast('No grammar mistakes found')
-      return
-    }
-
-    toast(`Grammar: ${markers.length} possible issue${markers.length > 1 ? 's' : ''}`)
-  }, [activeDoc, toast])
-
   function renameDoc(docId) {
     const doc = docs.find(d => d.id === docId)
     if (!doc) return
@@ -537,16 +503,12 @@ export default function App() {
         // Ctrl+/ => Settings
         e.preventDefault()
         setSettingsOpen(true)
-      } else if (k === 'g' && e.altKey) {
-        // Ctrl+Alt+G => Grammar check
-        e.preventDefault()
-        runGrammarCheck()
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [newDoc, openDoc, runGrammarCheck, saveDoc])
+  }, [newDoc, openDoc, saveDoc])
 
   // Warn on unload if any doc dirty
   useEffect(() => {
@@ -659,10 +621,6 @@ export default function App() {
             title="Toggle theme"
           >
             {settings.theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
-
-          <button className="btn" type="button" onClick={runGrammarCheck} title="Grammar check (Ctrl+Alt+G)">
-            Grammar
           </button>
 
           <button className="btn" type="button" onClick={() => setSettingsOpen(true)} title="Settings (Ctrl+/)">
@@ -851,7 +809,6 @@ export default function App() {
                     Ctrl+O: Open file<br />
                     Ctrl+S: Save<br />
                     Ctrl+Shift+S: Save As<br />
-                    Ctrl+Alt+G: Grammar check<br />
                     Ctrl+F / Ctrl+H: Find / Replace<br />
                     Ctrl+/: Settings
                   </div>

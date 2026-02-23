@@ -15,7 +15,6 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Font size, word wrap, minimap toggles
 - Help dialog (explains Wrap/Minimap + shortcuts)
 - Save As + Format button
-- Grammar checker (highlights possible mistakes in editor)
 - Drag & drop a file onto the editor to open it
 - Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
@@ -37,7 +36,6 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - Ctrl+O: Open file
 - Ctrl+S: Save
 - Ctrl+Shift+S: Save As
-- Ctrl+Alt+G: Grammar check
 - Ctrl+F: Find (Monaco)
 - Ctrl+H: Replace (Monaco)
 - Ctrl+/: Help
