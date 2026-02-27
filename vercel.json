@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "installCommand": "npm run install:app",
+  "buildCommand": "npm run build",
+  "outputDirectory": "react-editor/dist"
+}

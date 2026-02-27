@@ -59,6 +59,7 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - Compile uses your backend configuration (`backend/.env`) and never calls compiler providers directly from browser.
 - If compile fails, check backend env values for `COMPILER_ENDPOINTS` and `COMPILER_API_KEY`.
 - For live collaboration, share the same `Room` value with your friend, then both click `Connect WS`.
+- On Vercel deploy, compile works through serverless `/api/compile`, but live WS collaboration needs an external WS host/service.
 - WebSocket sync sends/receives JSON messages in this shape:
 
 ```json
