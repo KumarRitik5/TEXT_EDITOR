@@ -46,7 +46,8 @@ Then open the URL Vite prints (usually http://localhost:5173).
 ## Notes
 
 - Autosave and editor settings are stored locally in your browser.
-- Compile uses the public Piston API endpoint.
+- Compile uses a configurable compiler endpoint.
+- `emkc.org` public execute is whitelist-only (since Feb 2026), so use your own hosted Piston URL or another provider endpoint.
 - If compile returns 401/403, set `Compiler URL` and `API Key` in Settings.
 - WebSocket sync sends/receives JSON messages in this shape:
 

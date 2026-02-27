@@ -1,6 +1,5 @@
 const DEFAULT_COMPILER_ENDPOINTS = [
   'https://piston.rs/api/v2/execute',
-  'https://emkc.org/api/v2/piston/execute',
 ]
 
 const LANGUAGE_MAP = {
@@ -72,6 +71,12 @@ export async function compileWithPiston({ language, code, timeoutMs = 20000, end
         })
 
         if (response.status === 401 || response.status === 403) {
+          const bodyText = await response.text().catch(() => '')
+          if (bodyText.toLowerCase().includes('whitelist only')) {
+            lastError = new Error(`Compiler endpoint at ${host} is whitelist-only. Use your own hosted Piston URL in Settings (or another provider endpoint with valid API key).`)
+            continue
+          }
+
           lastError = new Error(`Compiler endpoint rejected request (${response.status}) at ${host}. Check Compiler URL/API key or try another endpoint.`)
           continue
         }
@@ -95,7 +100,12 @@ export async function compileWithPiston({ language, code, timeoutMs = 20000, end
         if (error?.name === 'AbortError') {
           throw new Error('Compilation timed out. Please try again.')
         }
-        lastError = error
+        const msg = String(error?.message || '')
+        if (msg) {
+          lastError = new Error(`Compiler endpoint unreachable at ${host}. ${msg}`)
+        } else {
+          lastError = error
+        }
       } finally {
         clearTimeout(timeoutId)
       }
