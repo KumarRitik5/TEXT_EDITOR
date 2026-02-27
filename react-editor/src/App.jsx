@@ -15,9 +15,13 @@ const DEFAULT_SETTINGS = {
   minimap: true,
   formatOnSave: true,
   vimMode: false,
-  websocketUrl: 'ws://localhost:8080',
-  compilerEndpoint: 'https://piston.rs/api/v2/execute',
-  compilerApiKey: '',
+  websocketUrl: '',
+}
+
+function getDefaultWebSocketUrl() {
+  if (typeof window === 'undefined') return 'ws://localhost:5173/ws'
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${protocol}://${window.location.host}/ws`
 }
 
 function getExt(name) {
@@ -172,7 +176,7 @@ export default function App() {
   }, [])
 
   const connectWebSocket = useCallback(() => {
-    const wsUrl = String(settings.websocketUrl || '').trim()
+    const wsUrl = String(settings.websocketUrl || getDefaultWebSocketUrl()).trim()
     if (!wsUrl) {
       toast('Enter a WebSocket URL first')
       return
@@ -262,8 +266,6 @@ export default function App() {
       const result = await compileWithPiston({
         language: activeDoc.language,
         code: activeDoc.value,
-        endpoint: settings.compilerEndpoint,
-        apiKey: settings.compilerApiKey,
       })
 
       const rawOutput = [result.stdout, result.stderr, result.output].find(Boolean) || 'No output'
@@ -279,7 +281,7 @@ export default function App() {
     } finally {
       setIsCompiling(false)
     }
-  }, [activeDoc, isCompiling, settings.compilerApiKey, settings.compilerEndpoint, toast])
+  }, [activeDoc, isCompiling, toast])
 
   function onBeforeEditorMount(monaco) {
     // Ensure JSX/TSX tokenize well when editing React files.
@@ -814,7 +816,7 @@ export default function App() {
               type="text"
               value={settings.websocketUrl || ''}
               onChange={(e) => setSettings({ websocketUrl: e.target.value })}
-              placeholder="ws://localhost:8080"
+              placeholder={getDefaultWebSocketUrl()}
             />
           </label>
 
@@ -1013,30 +1015,6 @@ export default function App() {
                       >
                         Vim: {settings.vimMode ? 'on' : 'off'}
                       </button>
-                    </div>
-
-                    <div className="settingsRow">
-                      <label className="field" title="Compiler execute endpoint">
-                        <span className="fieldLabel">Compiler URL</span>
-                        <input
-                          className="input wideInput"
-                          type="text"
-                          value={settings.compilerEndpoint}
-                          onChange={(e) => setSettings({ compilerEndpoint: e.target.value })}
-                          placeholder="https://piston.rs/api/v2/execute"
-                        />
-                      </label>
-
-                      <label className="field" title="Compiler API key (optional)">
-                        <span className="fieldLabel">API Key</span>
-                        <input
-                          className="input medInput"
-                          type="password"
-                          value={settings.compilerApiKey}
-                          onChange={(e) => setSettings({ compilerApiKey: e.target.value })}
-                          placeholder="Optional"
-                        />
-                      </label>
                     </div>
 
                     <div className="settingsRow">

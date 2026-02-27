@@ -16,14 +16,24 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Help dialog (explains Wrap/Minimap + shortcuts)
 - Save As + Format button
 - Compile button (Piston API)
-- WebSocket live document sync (connect/disconnect from toolbar)
+- Compile now goes through backend `/api/compile`
+- WebSocket live document sync via backend `/ws` (connect/disconnect from toolbar)
 - Drag & drop a file onto the editor to open it
 - Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
 
 ## Run
 
-From this folder:
+From workspace root (recommended):
+
+```powershell
+npm run install:app
+npm run install:backend
+npm run dev:backend
+npm run dev:frontend
+```
+
+Or from this folder only (frontend):
 
 ```powershell
 npm install
@@ -46,9 +56,8 @@ Then open the URL Vite prints (usually http://localhost:5173).
 ## Notes
 
 - Autosave and editor settings are stored locally in your browser.
-- Compile uses a configurable compiler endpoint.
-- `emkc.org` public execute is whitelist-only (since Feb 2026), so use your own hosted Piston URL or another provider endpoint.
-- If compile returns 401/403, set `Compiler URL` and `API Key` in Settings.
+- Compile uses your backend configuration (`backend/.env`) and never calls compiler providers directly from browser.
+- If compile fails, check backend env values for `COMPILER_ENDPOINTS` and `COMPILER_API_KEY`.
 - WebSocket sync sends/receives JSON messages in this shape:
 
 ```json

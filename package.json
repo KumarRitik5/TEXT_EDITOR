@@ -4,8 +4,11 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "npm --prefix react-editor run dev",
+    "dev:frontend": "npm --prefix react-editor run dev",
+    "dev:backend": "npm --prefix backend run dev",
     "build": "npm --prefix react-editor run build",
     "preview": "npm --prefix react-editor run preview",
-    "install:app": "npm --prefix react-editor install"
+    "install:app": "npm --prefix react-editor install",
+    "install:backend": "npm --prefix backend install"
   }
 }
