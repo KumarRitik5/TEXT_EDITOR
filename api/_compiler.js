@@ -12,10 +12,21 @@ const SUPPORTED_LANGUAGES = {
 }
 
 function getCompilerEndpoints() {
-  return String(process.env.COMPILER_ENDPOINTS || 'https://piston.rs/api/v2/execute')
-    .split(',')
+  const raw = [
+    process.env.COMPILER_ENDPOINTS,
+    process.env.COMPILER_ENDPOINT,
+    'https://piston.rs/api/v2/execute',
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(',')
+
+  const list = raw
+    .split(/[\n,;]+/)
     .map((value) => value.trim())
     .filter(Boolean)
+
+  return [...new Set(list)]
 }
 
 async function executeWithEndpoint({ endpoint, language, code, stdin, timeoutMs, apiKey }) {
@@ -166,6 +177,20 @@ async function compileCode({ language, code, stdin, timeoutMs }) {
         error: 'compiler_whitelist_only',
         message: `Compiler endpoint at ${lastFailure.endpoint} is whitelist-only. Use your own hosted compiler endpoint.`,
         details: lastFailure.bodyText || '',
+      },
+    }
+  }
+
+  const failedByNetwork = lastFailure?.status === 502
+    && String(lastFailure?.bodyText || '').toLowerCase().includes('fetch failed')
+
+  if (failedByNetwork) {
+    return {
+      status: 502,
+      body: {
+        error: 'compiler_network_failed',
+        message: 'Compiler endpoint is unreachable from deployment runtime. Configure COMPILER_ENDPOINTS with a reachable hosted compiler URL.',
+        details: lastFailure?.bodyText || '',
       },
     }
   }

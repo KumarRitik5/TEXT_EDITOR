@@ -144,6 +144,7 @@ export default function App() {
   const [wsStatus, setWsStatus] = useState('disconnected')
   const [participants, setParticipants] = useState([])
   const [apiStatus, setApiStatus] = useState('checking')
+  const [compileHint, setCompileHint] = useState('')
 
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
 
@@ -291,6 +292,28 @@ export default function App() {
     })
 
     setActiveId(roomDocId)
+  }, [])
+
+  const formatCompileHint = useCallback((message) => {
+    const text = String(message || '').toLowerCase()
+
+    if (text.includes('compiler endpoint is unreachable') || text.includes('fetch failed')) {
+      return 'Compile is not reachable from deployment. Set Vercel COMPILER_ENDPOINTS to your hosted compiler API, then redeploy.'
+    }
+
+    if (text.includes('whitelist-only') || text.includes('whitelist only')) {
+      return 'Compile provider is whitelist-only. Switch COMPILER_ENDPOINTS to your own hosted compiler endpoint.'
+    }
+
+    if (text.includes('auth') || text.includes('401') || text.includes('403')) {
+      return 'Compile authentication failed. Verify COMPILER_API_KEY and endpoint access settings in Vercel.'
+    }
+
+    if (text.includes('timed out')) {
+      return 'Compile request timed out. Retry or use a lower-latency compiler endpoint.'
+    }
+
+    return 'Compilation failed. Check /api/health and Vercel environment variables.'
   }, [])
 
   const disconnectWebSocket = useCallback(() => {
@@ -455,6 +478,7 @@ export default function App() {
 
     try {
       setIsCompiling(true)
+      setCompileHint('')
       const result = await compileWithPiston({
         language: activeDoc.language,
         code: activeDoc.value,
@@ -469,11 +493,13 @@ export default function App() {
         toast(preview ? `Compile failed: ${preview}` : `Compile failed (exit ${result.code})`)
       }
     } catch (error) {
-      toast(String(error?.message || 'Compilation failed'))
+      const message = String(error?.message || 'Compilation failed')
+      toast(message)
+      setCompileHint(formatCompileHint(message))
     } finally {
       setIsCompiling(false)
     }
-  }, [activeDoc, isCompiling, toast])
+  }, [activeDoc, formatCompileHint, isCompiling, toast])
 
   function onBeforeEditorMount(monaco) {
     // Ensure JSX/TSX tokenize well when editing React files.
@@ -1091,6 +1117,12 @@ export default function App() {
       {apiStatus === 'error' ? (
         <div className="deployHint" role="alert" aria-live="assertive">
           API health check failed. Verify Vercel env vars and `/api/health` route.
+        </div>
+      ) : null}
+
+      {compileHint ? (
+        <div className="deployHint deployHintError" role="alert" aria-live="assertive">
+          {compileHint}
         </div>
       ) : null}
 

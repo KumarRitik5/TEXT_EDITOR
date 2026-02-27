@@ -336,6 +336,16 @@ body{
   background: rgba(31,107,255,0.10);
 }
 
+.deployHintError{
+  background: rgba(255,122,162,0.14);
+  border-color: rgba(255,122,162,0.34);
+}
+
+:root[data-theme="light"] .deployHintError{
+  background: rgba(201,27,59,0.10);
+  border-color: rgba(201,27,59,0.28);
+}
+
 :root[data-theme="dark"] .tabs{
   background: rgba(16,22,38,0.50);
 }
