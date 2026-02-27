@@ -15,6 +15,8 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Font size, word wrap, minimap toggles
 - Help dialog (explains Wrap/Minimap + shortcuts)
 - Save As + Format button
+- Compile button (Piston API)
+- WebSocket live document sync (connect/disconnect from toolbar)
 - Drag & drop a file onto the editor to open it
 - Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
@@ -39,7 +41,24 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - Ctrl+F: Find (Monaco)
 - Ctrl+H: Replace (Monaco)
 - Ctrl+/: Help
+- Ctrl+Enter: Compile active document
 
 ## Notes
 
-- Your files are not uploaded anywhere. Autosave is stored locally in your browser.
+- Autosave and editor settings are stored locally in your browser.
+- Compile uses the public Piston API endpoint.
+- WebSocket sync sends/receives JSON messages in this shape:
+
+```json
+{
+	"type": "doc:sync",
+	"clientId": "client-uuid",
+	"doc": {
+		"id": "doc-id",
+		"name": "main.py",
+		"language": "python",
+		"value": "print('hi')",
+		"updatedAt": 1700000000000
+	}
+}
+```

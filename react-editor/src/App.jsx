@@ -6,6 +6,7 @@ import './App.css'
 import LanguagePicker from './components/LanguagePicker'
 import { clearSettings, clearState, loadSettings, loadState, saveSettings, saveState } from './lib/storage'
 import { guessLanguageFromFilename, openTextFile, saveTextFile } from './lib/files'
+import { compileWithPiston, getCompilerLanguage } from './lib/compiler'
 
 const DEFAULT_SETTINGS = {
   theme: 'dark',
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS = {
   minimap: true,
   formatOnSave: true,
   vimMode: false,
+  websocketUrl: 'ws://localhost:8080',
 }
 
 function getExt(name) {
@@ -110,6 +112,7 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
+  const [wsStatus, setWsStatus] = useState('disconnected')
 
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
 
@@ -133,7 +136,13 @@ export default function App() {
   }, [docs, activeId])
 
   const [toastMsg, setToastMsg] = useState('')
+  const [isCompiling, setIsCompiling] = useState(false)
   const toastTimer = useRef(null)
+  const wsRef = useRef(null)
+  const wsClientIdRef = useRef(makeId())
+  const remoteSyncRef = useRef(false)
+  const wsSyncTimerRef = useRef(null)
+
   const toast = useCallback((message) => {
     setToastMsg(message)
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -143,6 +152,130 @@ export default function App() {
   const setSettings = useCallback((patch) => {
     setSettingsState(s => ({ ...s, ...patch }))
   }, [])
+
+  const disconnectWebSocket = useCallback(() => {
+    const socket = wsRef.current
+    if (!socket) {
+      setWsStatus('disconnected')
+      return
+    }
+
+    wsRef.current = null
+    try {
+      socket.close(1000, 'client disconnect')
+    } catch {
+      // ignore
+    }
+    setWsStatus('disconnected')
+  }, [])
+
+  const connectWebSocket = useCallback(() => {
+    const wsUrl = String(settings.websocketUrl || '').trim()
+    if (!wsUrl) {
+      toast('Enter a WebSocket URL first')
+      return
+    }
+
+    if (!/^wss?:\/\//i.test(wsUrl)) {
+      toast('WebSocket URL must start with ws:// or wss://')
+      return
+    }
+
+    disconnectWebSocket()
+    setWsStatus('connecting')
+
+    try {
+      const socket = new WebSocket(wsUrl)
+      wsRef.current = socket
+
+      socket.onopen = () => {
+        if (wsRef.current !== socket) return
+        setWsStatus('connected')
+        toast('WebSocket connected')
+      }
+
+      socket.onmessage = (event) => {
+        let data = null
+        try {
+          data = JSON.parse(event.data)
+        } catch {
+          return
+        }
+
+        if (!data || data.clientId === wsClientIdRef.current) return
+        if (data.type !== 'doc:sync' || !data.doc || !data.doc.id) return
+
+        remoteSyncRef.current = true
+        setDocs(prev => {
+          const index = prev.findIndex(d => d.id === data.doc.id)
+          if (index === -1) {
+            return [...prev, {
+              id: data.doc.id,
+              name: data.doc.name || 'Remote document',
+              language: data.doc.language || 'plaintext',
+              value: data.doc.value || '',
+              savedValue: data.doc.value || '',
+              updatedAt: Date.now(),
+            }]
+          }
+
+          return prev.map(d => {
+            if (d.id !== data.doc.id) return d
+            return {
+              ...d,
+              name: data.doc.name || d.name,
+              language: data.doc.language || d.language,
+              value: String(data.doc.value ?? ''),
+              updatedAt: Date.now(),
+            }
+          })
+        })
+      }
+
+      socket.onerror = () => {
+        if (wsRef.current !== socket) return
+        toast('WebSocket error')
+      }
+
+      socket.onclose = () => {
+        if (wsRef.current === socket) wsRef.current = null
+        setWsStatus('disconnected')
+      }
+    } catch {
+      setWsStatus('disconnected')
+      toast('WebSocket connection failed')
+    }
+  }, [disconnectWebSocket, settings.websocketUrl, toast])
+
+  const compileActiveDoc = useCallback(async () => {
+    if (!activeDoc || isCompiling) return
+
+    if (!getCompilerLanguage(activeDoc.language)) {
+      toast('Selected language is not supported for compilation')
+      return
+    }
+
+    try {
+      setIsCompiling(true)
+      const result = await compileWithPiston({
+        language: activeDoc.language,
+        code: activeDoc.value,
+      })
+
+      const rawOutput = [result.stdout, result.stderr, result.output].find(Boolean) || 'No output'
+      const preview = rawOutput.replace(/\s+/g, ' ').trim().slice(0, 120)
+
+      if (result.success) {
+        toast(preview ? `Compiled successfully: ${preview}` : 'Compiled successfully')
+      } else {
+        toast(preview ? `Compile failed: ${preview}` : `Compile failed (exit ${result.code})`)
+      }
+    } catch (error) {
+      toast(String(error?.message || 'Compilation failed'))
+    } finally {
+      setIsCompiling(false)
+    }
+  }, [activeDoc, isCompiling, toast])
 
   function onBeforeEditorMount(monaco) {
     // Ensure JSX/TSX tokenize well when editing React files.
@@ -488,6 +621,12 @@ export default function App() {
       const mod = isMac ? e.metaKey : e.ctrlKey
       if (!mod) return
 
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        compileActiveDoc()
+        return
+      }
+
       const k = e.key.toLowerCase()
       if (k === 's') {
         e.preventDefault()
@@ -508,7 +647,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [newDoc, openDoc, saveDoc])
+  }, [compileActiveDoc, newDoc, openDoc, saveDoc])
 
   // Warn on unload if any doc dirty
   useEffect(() => {
@@ -521,6 +660,56 @@ export default function App() {
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [docs])
+
+  // Broadcast active doc updates through websocket.
+  useEffect(() => {
+    const socket = wsRef.current
+    if (!socket || wsStatus !== 'connected' || !activeDoc) return
+
+    if (remoteSyncRef.current) {
+      remoteSyncRef.current = false
+      return
+    }
+
+    clearTimeout(wsSyncTimerRef.current)
+    wsSyncTimerRef.current = setTimeout(() => {
+      const liveSocket = wsRef.current
+      if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN) return
+
+      try {
+        liveSocket.send(JSON.stringify({
+          type: 'doc:sync',
+          clientId: wsClientIdRef.current,
+          doc: {
+            id: activeDoc.id,
+            name: activeDoc.name,
+            language: activeDoc.language,
+            value: activeDoc.value,
+            updatedAt: Date.now(),
+          },
+        }))
+      } catch {
+        // ignore transient send failures
+      }
+    }, 220)
+
+    return () => clearTimeout(wsSyncTimerRef.current)
+  }, [activeDoc?.id, activeDoc?.language, activeDoc?.name, activeDoc?.value, wsStatus])
+
+  // Cleanup websocket on unmount.
+  useEffect(() => {
+    return () => {
+      clearTimeout(wsSyncTimerRef.current)
+      const socket = wsRef.current
+      wsRef.current = null
+      if (!socket) return
+      try {
+        socket.close(1000, 'app unmount')
+      } catch {
+        // ignore
+      }
+    }
+  }, [])
 
   // Close settings on Escape
   useEffect(() => {
@@ -614,6 +803,36 @@ export default function App() {
             onChange={(next) => updateActive({ language: next })}
           />
 
+          <label className="field" title="WebSocket URL">
+            <span className="fieldLabel">WS</span>
+            <input
+              className="input wsInput"
+              type="text"
+              value={settings.websocketUrl || ''}
+              onChange={(e) => setSettings({ websocketUrl: e.target.value })}
+              placeholder="ws://localhost:8080"
+            />
+          </label>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={wsStatus === 'connected' ? disconnectWebSocket : connectWebSocket}
+            title={wsStatus === 'connected' ? 'Disconnect WebSocket' : 'Connect WebSocket'}
+          >
+            {wsStatus === 'connected' ? 'Disconnect WS' : wsStatus === 'connecting' ? 'Connecting…' : 'Connect WS'}
+          </button>
+
+          <button
+            className="btn"
+            type="button"
+            onClick={compileActiveDoc}
+            disabled={!activeDoc || isCompiling || !getCompilerLanguage(activeDoc?.language)}
+            title="Compile (Ctrl+Enter)"
+          >
+            {isCompiling ? 'Compiling…' : 'Compile'}
+          </button>
+
           <button
             className="btn"
             type="button"
@@ -706,6 +925,7 @@ export default function App() {
           <span className="pill">Words: {stats.words}</span>
         </div>
         <div className="statusRight">
+          <span className="pill">WS: {wsStatus}</span>
           <span
             className="pill"
             ref={vimStatusRef}
