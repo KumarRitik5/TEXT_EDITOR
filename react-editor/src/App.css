@@ -208,6 +208,8 @@ body{
 
 .input{ width: 90px; }
 .wsInput{ width: 180px; }
+.wideInput{ width: 320px; }
+.medInput{ width: 180px; }
 
 /* Language picker (custom dropdown) */
 .lpRoot{ position: relative; }

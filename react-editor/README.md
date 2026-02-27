@@ -47,6 +47,7 @@ Then open the URL Vite prints (usually http://localhost:5173).
 
 - Autosave and editor settings are stored locally in your browser.
 - Compile uses the public Piston API endpoint.
+- If compile returns 401/403, set `Compiler URL` and `API Key` in Settings.
 - WebSocket sync sends/receives JSON messages in this shape:
 
 ```json

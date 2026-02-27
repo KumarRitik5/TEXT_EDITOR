@@ -16,6 +16,8 @@ const DEFAULT_SETTINGS = {
   formatOnSave: true,
   vimMode: false,
   websocketUrl: 'ws://localhost:8080',
+  compilerEndpoint: 'https://piston.rs/api/v2/execute',
+  compilerApiKey: '',
 }
 
 function getExt(name) {
@@ -260,6 +262,8 @@ export default function App() {
       const result = await compileWithPiston({
         language: activeDoc.language,
         code: activeDoc.value,
+        endpoint: settings.compilerEndpoint,
+        apiKey: settings.compilerApiKey,
       })
 
       const rawOutput = [result.stdout, result.stderr, result.output].find(Boolean) || 'No output'
@@ -275,7 +279,7 @@ export default function App() {
     } finally {
       setIsCompiling(false)
     }
-  }, [activeDoc, isCompiling, toast])
+  }, [activeDoc, isCompiling, settings.compilerApiKey, settings.compilerEndpoint, toast])
 
   function onBeforeEditorMount(monaco) {
     // Ensure JSX/TSX tokenize well when editing React files.
@@ -1009,6 +1013,30 @@ export default function App() {
                       >
                         Vim: {settings.vimMode ? 'on' : 'off'}
                       </button>
+                    </div>
+
+                    <div className="settingsRow">
+                      <label className="field" title="Compiler execute endpoint">
+                        <span className="fieldLabel">Compiler URL</span>
+                        <input
+                          className="input wideInput"
+                          type="text"
+                          value={settings.compilerEndpoint}
+                          onChange={(e) => setSettings({ compilerEndpoint: e.target.value })}
+                          placeholder="https://piston.rs/api/v2/execute"
+                        />
+                      </label>
+
+                      <label className="field" title="Compiler API key (optional)">
+                        <span className="fieldLabel">API Key</span>
+                        <input
+                          className="input medInput"
+                          type="password"
+                          value={settings.compilerApiKey}
+                          onChange={(e) => setSettings({ compilerApiKey: e.target.value })}
+                          placeholder="Optional"
+                        />
+                      </label>
                     </div>
 
                     <div className="settingsRow">

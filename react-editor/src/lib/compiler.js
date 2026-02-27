@@ -1,4 +1,7 @@
-const PISTON_EXECUTE_URL = 'https://emkc.org/api/v2/piston/execute'
+const DEFAULT_COMPILER_ENDPOINTS = [
+  'https://piston.rs/api/v2/execute',
+  'https://emkc.org/api/v2/piston/execute',
+]
 
 const LANGUAGE_MAP = {
   javascript: 'javascript',
@@ -17,47 +20,79 @@ export function getCompilerLanguage(monacoLanguage) {
   return LANGUAGE_MAP[monacoLanguage] || null
 }
 
-export async function compileWithPiston({ language, code, timeoutMs = 20000 }) {
+function buildEndpoints(customEndpoint) {
+  const list = [customEndpoint, ...DEFAULT_COMPILER_ENDPOINTS]
+  const cleaned = list
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+
+  return [...new Set(cleaned)]
+}
+
+export async function compileWithPiston({ language, code, timeoutMs = 20000, endpoint, apiKey }) {
   const compilerLanguage = getCompilerLanguage(language)
   if (!compilerLanguage) {
     throw new Error('This language is not supported for compilation yet.')
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const endpoints = buildEndpoints(endpoint)
+  let lastError = null
 
-  try {
-    const response = await fetch(PISTON_EXECUTE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: compilerLanguage,
-        version: '*',
-        files: [{ content: code || '' }],
-      }),
-      signal: controller.signal,
-    })
+  for (const executeUrl of endpoints) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-    if (!response.ok) {
-      throw new Error(`Compiler request failed (${response.status})`)
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+
+      const cleanApiKey = String(apiKey || '').trim()
+      if (cleanApiKey) {
+        headers.Authorization = `Bearer ${cleanApiKey}`
+        headers['X-API-Key'] = cleanApiKey
+      }
+
+      const response = await fetch(executeUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          language: compilerLanguage,
+          version: '*',
+          files: [{ content: code || '' }],
+        }),
+        signal: controller.signal,
+      })
+
+      if (response.status === 401 || response.status === 403) {
+        lastError = new Error('Compiler authentication failed. Set a valid API key in Settings.')
+        continue
+      }
+
+      if (!response.ok) {
+        lastError = new Error(`Compiler request failed (${response.status})`)
+        continue
+      }
+
+      const data = await response.json()
+      const run = data?.run || {}
+
+      return {
+        success: Number(run.code || 0) === 0,
+        code: Number(run.code || 0),
+        stdout: String(run.stdout || ''),
+        stderr: String(run.stderr || ''),
+        output: String(run.output || ''),
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        throw new Error('Compilation timed out. Please try again.')
+      }
+      lastError = error
+    } finally {
+      clearTimeout(timeoutId)
     }
-
-    const data = await response.json()
-    const run = data?.run || {}
-
-    return {
-      success: Number(run.code || 0) === 0,
-      code: Number(run.code || 0),
-      stdout: String(run.stdout || ''),
-      stderr: String(run.stderr || ''),
-      output: String(run.output || ''),
-    }
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Compilation timed out. Please try again.')
-    }
-    throw error
-  } finally {
-    clearTimeout(timeoutId)
   }
+
+  throw lastError || new Error('Compilation failed')
 }
