@@ -17,7 +17,7 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Save As + Format button
 - Compile button (Piston API)
 - Compile now goes through backend `/api/compile`
-- WebSocket live document sync via backend `/ws` (connect/disconnect from toolbar)
+- Room-based WebSocket live collaboration via backend `/ws` (same room id = same live document)
 - Drag & drop a file onto the editor to open it
 - Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
@@ -58,6 +58,7 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - Autosave and editor settings are stored locally in your browser.
 - Compile uses your backend configuration (`backend/.env`) and never calls compiler providers directly from browser.
 - If compile fails, check backend env values for `COMPILER_ENDPOINTS` and `COMPILER_API_KEY`.
+- For live collaboration, share the same `Room` value with your friend, then both click `Connect WS`.
 - WebSocket sync sends/receives JSON messages in this shape:
 
 ```json

@@ -6,7 +6,7 @@ Backend service for Textory frontend.
 
 - `GET /api/health` health + config visibility
 - `POST /api/compile` compiler proxy endpoint
-- `WS /ws` broadcast channel for live document sync
+- `WS /ws` room-based channel for live document sync + presence updates
 
 ## Setup
 

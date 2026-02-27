@@ -208,6 +208,8 @@ body{
 
 .input{ width: 90px; }
 .wsInput{ width: 180px; }
+.roomInput{ width: 120px; }
+.nameInput{ width: 120px; }
 .wideInput{ width: 320px; }
 .medInput{ width: 180px; }
 

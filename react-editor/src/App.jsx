@@ -16,12 +16,33 @@ const DEFAULT_SETTINGS = {
   formatOnSave: true,
   vimMode: false,
   websocketUrl: '',
+  collabRoom: 'lobby',
+  collabUserName: '',
 }
 
 function getDefaultWebSocketUrl() {
   if (typeof window === 'undefined') return 'ws://localhost:5173/ws'
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${protocol}://${window.location.host}/ws`
+}
+
+function sanitizeRoomId(value) {
+  const clean = String(value || '').trim().toLowerCase().replace(/[^a-z0-9-_]/g, '')
+  return clean || 'lobby'
+}
+
+function sanitizeUserName(value) {
+  const clean = String(value || '').trim()
+  if (!clean) return 'Guest'
+  return clean.slice(0, 40)
+}
+
+function getRoomDocId(roomId) {
+  return `room:${sanitizeRoomId(roomId)}`
+}
+
+function getRoomDocName(roomId) {
+  return `Room ${sanitizeRoomId(roomId)}.txt`
 }
 
 function getExt(name) {
@@ -89,9 +110,9 @@ function makeId() {
   return globalThis.crypto?.randomUUID?.() ?? String(Date.now()) + '-' + Math.random().toString(16).slice(2)
 }
 
-function createDoc({ name, language, value }) {
+function createDoc({ id, name, language, value }) {
   return {
-    id: makeId(),
+    id: id || makeId(),
     name: name || 'Untitled',
     language: language || 'plaintext',
     value: value || '',
@@ -119,6 +140,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
   const [wsStatus, setWsStatus] = useState('disconnected')
+  const [participants, setParticipants] = useState([])
 
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
 
@@ -159,6 +181,33 @@ export default function App() {
     setSettingsState(s => ({ ...s, ...patch }))
   }, [])
 
+  const collabRoomId = useMemo(() => sanitizeRoomId(settings.collabRoom), [settings.collabRoom])
+  const collabUserName = useMemo(() => sanitizeUserName(settings.collabUserName), [settings.collabUserName])
+
+  const ensureRoomDoc = useCallback((roomId) => {
+    const roomDocId = getRoomDocId(roomId)
+    const roomDocName = getRoomDocName(roomId)
+
+    setDocs(prev => {
+      const exists = prev.some(d => d.id === roomDocId)
+      if (exists) {
+        return prev.map(d => {
+          if (d.id !== roomDocId || d.name === roomDocName) return d
+          return { ...d, name: roomDocName }
+        })
+      }
+
+      return [...prev, createDoc({
+        id: roomDocId,
+        name: roomDocName,
+        language: 'plaintext',
+        value: '',
+      })]
+    })
+
+    setActiveId(roomDocId)
+  }, [])
+
   const disconnectWebSocket = useCallback(() => {
     const socket = wsRef.current
     if (!socket) {
@@ -172,6 +221,7 @@ export default function App() {
     } catch {
       // ignore
     }
+    setParticipants([])
     setWsStatus('disconnected')
   }, [])
 
@@ -189,15 +239,34 @@ export default function App() {
 
     disconnectWebSocket()
     setWsStatus('connecting')
+    setParticipants([])
 
     try {
-      const socket = new WebSocket(wsUrl)
+      const joinUrl = new URL(wsUrl)
+      joinUrl.searchParams.set('room', collabRoomId)
+      joinUrl.searchParams.set('name', collabUserName)
+      joinUrl.searchParams.set('clientId', wsClientIdRef.current)
+
+      const socket = new WebSocket(joinUrl.toString())
       wsRef.current = socket
 
       socket.onopen = () => {
         if (wsRef.current !== socket) return
         setWsStatus('connected')
-        toast('WebSocket connected')
+        ensureRoomDoc(collabRoomId)
+
+        try {
+          socket.send(JSON.stringify({
+            type: 'join',
+            roomId: collabRoomId,
+            userName: collabUserName,
+            clientId: wsClientIdRef.current,
+          }))
+        } catch {
+          // ignore
+        }
+
+        toast(`Connected to room: ${collabRoomId}`)
       }
 
       socket.onmessage = (event) => {
@@ -208,16 +277,53 @@ export default function App() {
           return
         }
 
-        if (!data || data.clientId === wsClientIdRef.current) return
-        if (data.type !== 'doc:sync' || !data.doc || !data.doc.id) return
+        if (!data) return
+
+        if (data.type === 'presence:update') {
+          if (data.roomId && sanitizeRoomId(data.roomId) !== collabRoomId) return
+          const next = Array.isArray(data.participants) ? data.participants : []
+          setParticipants(next)
+          return
+        }
+
+        if (data.type === 'room:state') {
+          if (data.roomId && sanitizeRoomId(data.roomId) !== collabRoomId) return
+
+          const next = Array.isArray(data.participants) ? data.participants : []
+          setParticipants(next)
+
+          if (!data.doc || typeof data.doc !== 'object') return
+
+          const roomDocId = getRoomDocId(collabRoomId)
+          ensureRoomDoc(collabRoomId)
+          remoteSyncRef.current = true
+          setDocs(prev => prev.map(d => {
+            if (d.id !== roomDocId) return d
+            return {
+              ...d,
+              name: data.doc.name || d.name,
+              language: data.doc.language || d.language,
+              value: String(data.doc.value ?? ''),
+              updatedAt: Date.now(),
+            }
+          }))
+          return
+        }
+
+        if (data.clientId === wsClientIdRef.current) return
+        if (data.type !== 'doc:sync' || !data.doc) return
+        if (data.roomId && sanitizeRoomId(data.roomId) !== collabRoomId) return
+
+        const roomDocId = getRoomDocId(collabRoomId)
+        ensureRoomDoc(collabRoomId)
 
         remoteSyncRef.current = true
         setDocs(prev => {
-          const index = prev.findIndex(d => d.id === data.doc.id)
+          const index = prev.findIndex(d => d.id === roomDocId)
           if (index === -1) {
             return [...prev, {
-              id: data.doc.id,
-              name: data.doc.name || 'Remote document',
+              id: roomDocId,
+              name: data.doc.name || getRoomDocName(collabRoomId),
               language: data.doc.language || 'plaintext',
               value: data.doc.value || '',
               savedValue: data.doc.value || '',
@@ -226,7 +332,7 @@ export default function App() {
           }
 
           return prev.map(d => {
-            if (d.id !== data.doc.id) return d
+            if (d.id !== roomDocId) return d
             return {
               ...d,
               name: data.doc.name || d.name,
@@ -245,13 +351,14 @@ export default function App() {
 
       socket.onclose = () => {
         if (wsRef.current === socket) wsRef.current = null
+        setParticipants([])
         setWsStatus('disconnected')
       }
     } catch {
       setWsStatus('disconnected')
       toast('WebSocket connection failed')
     }
-  }, [disconnectWebSocket, settings.websocketUrl, toast])
+  }, [collabRoomId, collabUserName, disconnectWebSocket, ensureRoomDoc, settings.websocketUrl, toast])
 
   const compileActiveDoc = useCallback(async () => {
     if (!activeDoc || isCompiling) return
@@ -672,6 +779,9 @@ export default function App() {
     const socket = wsRef.current
     if (!socket || wsStatus !== 'connected' || !activeDoc) return
 
+    const roomDocId = getRoomDocId(collabRoomId)
+    if (activeDoc.id !== roomDocId) return
+
     if (remoteSyncRef.current) {
       remoteSyncRef.current = false
       return
@@ -685,9 +795,11 @@ export default function App() {
       try {
         liveSocket.send(JSON.stringify({
           type: 'doc:sync',
+          roomId: collabRoomId,
+          userName: collabUserName,
           clientId: wsClientIdRef.current,
           doc: {
-            id: activeDoc.id,
+            id: roomDocId,
             name: activeDoc.name,
             language: activeDoc.language,
             value: activeDoc.value,
@@ -700,7 +812,7 @@ export default function App() {
     }, 220)
 
     return () => clearTimeout(wsSyncTimerRef.current)
-  }, [activeDoc?.id, activeDoc?.language, activeDoc?.name, activeDoc?.value, wsStatus])
+  }, [activeDoc, collabRoomId, collabUserName, wsStatus])
 
   // Cleanup websocket on unmount.
   useEffect(() => {
@@ -820,6 +932,28 @@ export default function App() {
             />
           </label>
 
+          <label className="field" title="Collaboration room id">
+            <span className="fieldLabel">Room</span>
+            <input
+              className="input roomInput"
+              type="text"
+              value={settings.collabRoom || ''}
+              onChange={(e) => setSettings({ collabRoom: e.target.value })}
+              placeholder="lobby"
+            />
+          </label>
+
+          <label className="field" title="Your display name">
+            <span className="fieldLabel">Name</span>
+            <input
+              className="input nameInput"
+              type="text"
+              value={settings.collabUserName || ''}
+              onChange={(e) => setSettings({ collabUserName: e.target.value })}
+              placeholder="Guest"
+            />
+          </label>
+
           <button
             className="btn"
             type="button"
@@ -932,6 +1066,8 @@ export default function App() {
         </div>
         <div className="statusRight">
           <span className="pill">WS: {wsStatus}</span>
+          <span className="pill">Room: {collabRoomId}</span>
+          <span className="pill">Peers: {participants.length}</span>
           <span
             className="pill"
             ref={vimStatusRef}

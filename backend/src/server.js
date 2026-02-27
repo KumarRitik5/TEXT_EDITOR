@@ -8,6 +8,9 @@ const app = express()
 const port = Number(process.env.PORT || 8787)
 const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173'
 
+const DEFAULT_ROOM = 'lobby'
+const rooms = new Map()
+
 app.use(cors({ origin: frontendOrigin }))
 app.use(express.json({ limit: '1mb' }))
 
@@ -29,6 +32,67 @@ function getCompilerEndpoints() {
     .split(',')
     .map(value => value.trim())
     .filter(Boolean)
+}
+
+function sanitizeRoomId(value) {
+  const clean = String(value || '').trim().toLowerCase()
+  if (!clean) return DEFAULT_ROOM
+  return clean.replace(/[^a-z0-9-_]/g, '').slice(0, 64) || DEFAULT_ROOM
+}
+
+function sanitizeUserName(value) {
+  const clean = String(value || '').trim()
+  if (!clean) return 'Guest'
+  return clean.slice(0, 40)
+}
+
+function getOrCreateRoom(roomId) {
+  const key = sanitizeRoomId(roomId)
+  const existing = rooms.get(key)
+  if (existing) return existing
+
+  const created = {
+    id: key,
+    sockets: new Set(),
+    users: new Map(),
+    latestDoc: null,
+  }
+  rooms.set(key, created)
+  return created
+}
+
+function removeSocketFromRoom(room, socket) {
+  room.sockets.delete(socket)
+  room.users.delete(socket)
+  if (room.sockets.size === 0) {
+    rooms.delete(room.id)
+  }
+}
+
+function getRoomParticipants(room) {
+  return Array.from(room.users.values())
+}
+
+function sendJson(socket, payload) {
+  if (!socket || socket.readyState !== 1) return
+  socket.send(JSON.stringify(payload))
+}
+
+function broadcastToRoom(room, payload, exceptSocket = null) {
+  const raw = JSON.stringify(payload)
+  for (const client of room.sockets) {
+    if (client.readyState !== 1) continue
+    if (exceptSocket && client === exceptSocket) continue
+    client.send(raw)
+  }
+}
+
+function publishPresence(room) {
+  broadcastToRoom(room, {
+    type: 'presence:update',
+    roomId: room.id,
+    participants: getRoomParticipants(room),
+  })
 }
 
 async function executeWithEndpoint({ endpoint, language, code, stdin, timeoutMs, apiKey }) {
@@ -189,12 +253,98 @@ app.post('/api/compile', async (req, res) => {
 const server = createServer(app)
 const wss = new WebSocketServer({ server, path: '/ws' })
 
-wss.on('connection', (socket) => {
-  socket.on('message', (raw) => {
-    for (const client of wss.clients) {
-      if (client === socket || client.readyState !== 1) continue
-      client.send(raw.toString())
+wss.on('connection', (socket, request) => {
+  let activeRoom = getOrCreateRoom(DEFAULT_ROOM)
+  let activeUserName = 'Guest'
+  let activeClientId = ''
+
+  const switchRoom = ({ roomId, userName, clientId }) => {
+    const nextRoom = getOrCreateRoom(roomId)
+    const nextUserName = sanitizeUserName(userName)
+    const nextClientId = String(clientId || '').trim()
+
+    if (activeRoom && activeRoom !== nextRoom) {
+      removeSocketFromRoom(activeRoom, socket)
+      publishPresence(activeRoom)
     }
+
+    activeRoom = nextRoom
+    activeUserName = nextUserName
+    activeClientId = nextClientId
+    socket._roomId = activeRoom.id
+    socket._userName = activeUserName
+    socket._clientId = activeClientId
+
+    activeRoom.sockets.add(socket)
+    activeRoom.users.set(socket, {
+      name: activeUserName,
+      clientId: activeClientId,
+    })
+
+    sendJson(socket, {
+      type: 'room:state',
+      roomId: activeRoom.id,
+      participants: getRoomParticipants(activeRoom),
+      doc: activeRoom.latestDoc,
+    })
+
+    publishPresence(activeRoom)
+  }
+
+  try {
+    const url = new URL(request?.url || '/', `http://localhost:${port}`)
+    switchRoom({
+      roomId: url.searchParams.get('room') || DEFAULT_ROOM,
+      userName: url.searchParams.get('name') || 'Guest',
+      clientId: url.searchParams.get('clientId') || '',
+    })
+  } catch {
+    switchRoom({ roomId: DEFAULT_ROOM, userName: 'Guest', clientId: '' })
+  }
+
+  socket.on('message', (raw) => {
+    let data = null
+    try {
+      data = JSON.parse(raw.toString())
+    } catch {
+      return
+    }
+
+    if (!data || typeof data !== 'object') return
+
+    if (data.type === 'join') {
+      switchRoom({
+        roomId: data.roomId,
+        userName: data.userName,
+        clientId: data.clientId,
+      })
+      return
+    }
+
+    if (data.type !== 'doc:sync') return
+    if (!data.doc || typeof data.doc !== 'object') return
+
+    activeRoom.latestDoc = {
+      id: String(data.doc.id || ''),
+      name: String(data.doc.name || ''),
+      language: String(data.doc.language || 'plaintext'),
+      value: String(data.doc.value || ''),
+      updatedAt: Date.now(),
+    }
+
+    broadcastToRoom(activeRoom, {
+      type: 'doc:sync',
+      roomId: activeRoom.id,
+      userName: activeUserName,
+      clientId: activeClientId,
+      doc: activeRoom.latestDoc,
+    }, socket)
+  })
+
+  socket.on('close', () => {
+    if (!activeRoom) return
+    removeSocketFromRoom(activeRoom, socket)
+    publishPresence(activeRoom)
   })
 })
 
