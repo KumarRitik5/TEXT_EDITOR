@@ -18,6 +18,7 @@ A React-based, more feature-rich text editor built with Vite + Monaco Editor.
 - Compile button (Piston API)
 - Compile now goes through backend `/api/compile`
 - Room-based WebSocket live collaboration via backend `/ws` (same room id = same live document)
+- Vercel-aware collaboration UI (`WS Host`, `Room`, `Name`, `Share Room`)
 - Drag & drop a file onto the editor to open it
 - Java support (syntax highlighting + language selection)
 - Status bar (words/chars/lines + cursor position)
@@ -60,6 +61,7 @@ Then open the URL Vite prints (usually http://localhost:5173).
 - If compile fails, check backend env values for `COMPILER_ENDPOINTS` and `COMPILER_API_KEY`.
 - For live collaboration, share the same `Room` value with your friend, then both click `Connect WS`.
 - On Vercel deploy, compile works through serverless `/api/compile`, but live WS collaboration needs an external WS host/service.
+- Vercel deploy shows a built-in hint banner to configure external WS host for realtime.
 - WebSocket sync sends/receives JSON messages in this shape:
 
 ```json

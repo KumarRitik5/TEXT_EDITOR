@@ -320,6 +320,22 @@ body{
   overflow: auto;
 }
 
+.deployHint{
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(166,200,255,0.10);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+:root[data-theme="light"] .deployHint{
+  background: rgba(31,107,255,0.10);
+}
+
 :root[data-theme="dark"] .tabs{
   background: rgba(16,22,38,0.50);
 }

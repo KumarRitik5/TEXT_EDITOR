@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS = {
 
 function getDefaultWebSocketUrl() {
   if (typeof window === 'undefined') return 'ws://localhost:5173/ws'
+  const host = String(window.location.hostname || '').toLowerCase()
+  if (host.endsWith('.vercel.app')) return ''
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${protocol}://${window.location.host}/ws`
 }
@@ -181,8 +183,53 @@ export default function App() {
     setSettingsState(s => ({ ...s, ...patch }))
   }, [])
 
+  const isVercelHost = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const host = String(window.location.hostname || '').toLowerCase()
+    return host.endsWith('.vercel.app')
+  }, [])
+
   const collabRoomId = useMemo(() => sanitizeRoomId(settings.collabRoom), [settings.collabRoom])
   const collabUserName = useMemo(() => sanitizeUserName(settings.collabUserName), [settings.collabUserName])
+
+  const copyRoomShareLink = useCallback(async () => {
+    try {
+      if (typeof window === 'undefined' || !window.navigator?.clipboard) {
+        toast('Clipboard not available')
+        return
+      }
+
+      const url = new URL(window.location.href)
+      url.searchParams.set('room', collabRoomId)
+      if (settings.websocketUrl) {
+        url.searchParams.set('ws', settings.websocketUrl)
+      } else {
+        url.searchParams.delete('ws')
+      }
+
+      await window.navigator.clipboard.writeText(url.toString())
+      toast('Room link copied')
+    } catch {
+      toast('Could not copy room link')
+    }
+  }, [collabRoomId, settings.websocketUrl, toast])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const room = params.get('room')
+    const ws = params.get('ws')
+    const name = params.get('name')
+
+    if (!room && !ws && !name) return
+
+    setSettingsState(prev => ({
+      ...prev,
+      collabRoom: room || prev.collabRoom,
+      websocketUrl: ws || prev.websocketUrl,
+      collabUserName: name || prev.collabUserName,
+    }))
+  }, [])
 
   const ensureRoomDoc = useCallback((roomId) => {
     const roomDocId = getRoomDocId(roomId)
@@ -228,7 +275,7 @@ export default function App() {
   const connectWebSocket = useCallback(() => {
     const wsUrl = String(settings.websocketUrl || getDefaultWebSocketUrl()).trim()
     if (!wsUrl) {
-      toast('Enter a WebSocket URL first')
+      toast(isVercelHost ? 'Set external WebSocket host first' : 'Enter a WebSocket URL first')
       return
     }
 
@@ -358,7 +405,7 @@ export default function App() {
       setWsStatus('disconnected')
       toast('WebSocket connection failed')
     }
-  }, [collabRoomId, collabUserName, disconnectWebSocket, ensureRoomDoc, settings.websocketUrl, toast])
+  }, [collabRoomId, collabUserName, disconnectWebSocket, ensureRoomDoc, isVercelHost, settings.websocketUrl, toast])
 
   const compileActiveDoc = useCallback(async () => {
     if (!activeDoc || isCompiling) return
@@ -921,14 +968,14 @@ export default function App() {
             onChange={(next) => updateActive({ language: next })}
           />
 
-          <label className="field" title="WebSocket URL">
-            <span className="fieldLabel">WS</span>
+          <label className="field" title="Realtime websocket host URL">
+            <span className="fieldLabel">WS Host</span>
             <input
               className="input wsInput"
               type="text"
               value={settings.websocketUrl || ''}
               onChange={(e) => setSettings({ websocketUrl: e.target.value })}
-              placeholder={getDefaultWebSocketUrl()}
+              placeholder={isVercelHost ? 'wss://your-realtime-host/ws' : (getDefaultWebSocketUrl() || 'ws://localhost:5173/ws')}
             />
           </label>
 
@@ -966,6 +1013,15 @@ export default function App() {
           <button
             className="btn"
             type="button"
+            onClick={copyRoomShareLink}
+            title="Copy share link with room and websocket host"
+          >
+            Share Room
+          </button>
+
+          <button
+            className="btn"
+            type="button"
             onClick={compileActiveDoc}
             disabled={!activeDoc || isCompiling || !getCompilerLanguage(activeDoc?.language)}
             title="Compile (Ctrl+Enter)"
@@ -987,6 +1043,12 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {isVercelHost ? (
+        <div className="deployHint" role="status" aria-live="polite">
+          Vercel mode: set external WS Host for live collaboration.
+        </div>
+      ) : null}
 
       <nav className="tabs" aria-label="Open documents">
         {docs.map((d) => {
@@ -1065,8 +1127,10 @@ export default function App() {
           <span className="pill">Words: {stats.words}</span>
         </div>
         <div className="statusRight">
+          <span className="pill">Mode: {isVercelHost ? 'Vercel' : 'Local'}</span>
           <span className="pill">WS: {wsStatus}</span>
           <span className="pill">Room: {collabRoomId}</span>
+          <span className="pill">You: {collabUserName}</span>
           <span className="pill">Peers: {participants.length}</span>
           <span
             className="pill"
