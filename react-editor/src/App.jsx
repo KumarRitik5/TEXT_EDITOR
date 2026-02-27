@@ -143,6 +143,7 @@ export default function App() {
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 })
   const [wsStatus, setWsStatus] = useState('disconnected')
   const [participants, setParticipants] = useState([])
+  const [apiStatus, setApiStatus] = useState('checking')
 
   const [settings, setSettingsState] = useState(() => ({ ...DEFAULT_SETTINGS, ...(loadSettings() || {}) }))
 
@@ -229,6 +230,43 @@ export default function App() {
       websocketUrl: ws || prev.websocketUrl,
       collabUserName: name || prev.collabUserName,
     }))
+  }, [])
+
+  useEffect(() => {
+    if (!isVercelHost) return
+
+    setSettingsState(prev => {
+      const currentWs = String(prev.websocketUrl || '').trim().toLowerCase()
+      if (!currentWs.includes('localhost') && !currentWs.includes('127.0.0.1')) return prev
+      return {
+        ...prev,
+        websocketUrl: '',
+      }
+    })
+  }, [isVercelHost])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
+
+    async function checkHealth() {
+      try {
+        setApiStatus('checking')
+        const response = await fetch('/api/health', { signal: controller.signal })
+        if (!response.ok) throw new Error('Health check failed')
+        setApiStatus('ok')
+      } catch {
+        setApiStatus('error')
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    checkHealth()
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [])
 
   const ensureRoomDoc = useCallback((roomId) => {
@@ -1050,6 +1088,12 @@ export default function App() {
         </div>
       ) : null}
 
+      {apiStatus === 'error' ? (
+        <div className="deployHint" role="alert" aria-live="assertive">
+          API health check failed. Verify Vercel env vars and `/api/health` route.
+        </div>
+      ) : null}
+
       <nav className="tabs" aria-label="Open documents">
         {docs.map((d) => {
           const isActive = d.id === activeDoc?.id
@@ -1128,6 +1172,7 @@ export default function App() {
         </div>
         <div className="statusRight">
           <span className="pill">Mode: {isVercelHost ? 'Vercel' : 'Local'}</span>
+          <span className="pill">API: {apiStatus}</span>
           <span className="pill">WS: {wsStatus}</span>
           <span className="pill">Room: {collabRoomId}</span>
           <span className="pill">You: {collabUserName}</span>
